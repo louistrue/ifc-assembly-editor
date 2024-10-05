@@ -1,0 +1,50 @@
+[
+  {
+    "index": 0,
+    "material": "Concrete",
+    "thickness": 200,
+    "properties": "PropertyA"
+  },
+  {
+    "index": 1,
+    "material": "Insulation",
+    "thickness": 100,
+    "properties": "PropertyB"
+  },
+  {
+    "index": 2,
+    "material": "Wood",
+    "thickness": 50,
+    "properties": "PropertyC"
+  },
+  {
+    "index": 3,
+    "material": "Steel",
+    "thickness": 150,
+    "properties": "PropertyD"
+  },
+  {
+    "index": 4,
+    "material": "Glass",
+    "thickness": 30,
+    "properties": "PropertyE"
+  },
+  {
+    "index": 5,
+    "material": "Gypsum",
+    "thickness": 25,
+    "properties": "PropertyF"
+  },
+  {
+    "index": 6,
+    "material": "Aluminum",
+    "thickness": 40,
+    "properties": "PropertyG"
+  },
+  {
+    "index": 7,
+    "material": "Brick",
+    "thickness": 120,
+    "properties": "PropertyH"
+  }
+]
