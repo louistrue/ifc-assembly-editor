@@ -795,3 +795,18 @@ input:checked + .slider:before {
 .delete-button:hover {
   background-color: #ff1a1a;
 }
+
+.property-set-name-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.property-set-name-input:focus {
+  outline: none;
+  border-bottom: 1px solid white;
+}

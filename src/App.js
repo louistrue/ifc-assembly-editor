@@ -1,11 +1,5 @@
 // src/App.js
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -200,6 +194,10 @@ const PropertySetNode = ({ data }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localName, setLocalName] = useState(data.name);
 
+  const handleDoubleClick = () => {
+    setIsEditing(true);
+  };
+
   const handleNameChange = (event) => {
     setLocalName(event.target.value);
   };
@@ -209,15 +207,14 @@ const PropertySetNode = ({ data }) => {
     setIsEditing(false);
   };
 
-  const handleNameKeyDown = (event) => {
+  const handleKeyDown = (event) => {
     if (event.key === "Enter") {
-      data.onChange(data.id, localName);
-      setIsEditing(false);
+      handleNameBlur();
     }
   };
 
   return (
-    <div className="property-set-node">
+    <div className="property-set-node" onDoubleClick={handleDoubleClick}>
       <Handle type="target" position={Position.Left} />
       <div className="property-set-content">
         {isEditing ? (
@@ -226,14 +223,12 @@ const PropertySetNode = ({ data }) => {
             value={localName}
             onChange={handleNameChange}
             onBlur={handleNameBlur}
-            onKeyDown={handleNameKeyDown}
+            onKeyDown={handleKeyDown}
             autoFocus
             className="property-set-name-input"
           />
         ) : (
-          <div className="property-set-name" onClick={() => setIsEditing(true)}>
-            {data.name}
-          </div>
+          <div className="property-set-name">{data.name}</div>
         )}
       </div>
     </div>
@@ -275,11 +270,7 @@ const EdgeWithButton = ({
     <>
       <path
         id={id}
-        style={{
-          ...style,
-          strokeWidth: 3, // Increased from 2 to 3
-          stroke: "#888",
-        }}
+        style={style}
         className="react-flow__edge-path"
         d={edgePath}
         markerEnd={markerEnd}
@@ -336,7 +327,7 @@ const CustomEdge = ({
         id={id}
         style={{
           ...style,
-          strokeWidth: 3, // Increased from 2 to 3
+          strokeWidth: 2,
           stroke: "#888",
           fill: "none",
           strokeDasharray: "5,5",
@@ -361,6 +352,17 @@ const CustomEdge = ({
       </foreignObject>
     </>
   );
+};
+
+const nodeTypes = {
+  custom: CustomNode,
+  property: PropertyNode,
+  propertySet: (props) => <PropertySetNode {...props} />,
+};
+
+const edgeTypes = {
+  default: EdgeWithButton,
+  custom: CustomEdge,
 };
 
 const PropertyPanel = ({
@@ -414,21 +416,19 @@ const PropertyPanel = ({
       </div>
       <div className="property-content">
         <p>Add, edit, or remove properties from your IFC layers.</p>
-        {properties.map((prop) => (
-          <div key={prop.id} className="property-item">
+        {properties.map((prop, index) => (
+          <div key={index} className="property-item">
             <input
               type="text"
               value={prop.name}
               onChange={(e) =>
-                updateProperty(prop.id, e.target.value, prop.type, prop.value)
+                updateProperty(`property-${index}`, e.target.value, prop.type)
               }
               placeholder="Property name"
             />
             <select
               value={prop.type}
-              onChange={(e) =>
-                updateProperty(prop.id, prop.name, e.target.value, prop.value)
-              }
+              onChange={(e) => updateProperty(index, prop.name, e.target.value)}
               title="Select property type"
             >
               <option value="IfcText">IfcText</option>
@@ -440,10 +440,10 @@ const PropertyPanel = ({
               <option value="IfcClassification">IfcClassification</option>
             </select>
             <button
-              onClick={() => deleteProperty(prop.id)}
+              onClick={() => deleteProperty(index)}
               title="Delete property"
             >
-              Delete
+              X
             </button>
           </div>
         ))}
@@ -634,7 +634,6 @@ const App = () => {
                   selectedType: newType,
                   value: newValue,
                 },
-                // Ensure we are only changing necessary styles
                 style: {
                   ...node.style,
                   backgroundColor: getPropertyNodeColor(newType),
@@ -644,11 +643,11 @@ const App = () => {
         )
       );
 
-      // Update the properties state separately
+      // Update the properties state as well
       setProperties((prevProperties) =>
-        prevProperties.map((prop) =>
-          prop.id === nodeId
-            ? { ...prop, name: newName, type: newType, value: newValue }
+        prevProperties.map((prop, index) =>
+          `property-${index}` === nodeId
+            ? { name: newName, type: newType, value: newValue }
             : prop
         )
       );
@@ -853,7 +852,7 @@ const App = () => {
 
   const removeEdge = useCallback(
     (edgeId) => {
-      setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+      setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
     },
     [setEdges]
   );
@@ -933,27 +932,22 @@ const App = () => {
 
   const addProperty = useCallback(
     (name, type) => {
-      const newPropertyId = `property-${Date.now()}`;
-      const newProperties = [
-        ...properties,
-        { id: newPropertyId, name, type, value: "" },
-      ];
+      const newProperties = [...properties, { name, type }];
       setProperties(newProperties);
 
       // Calculate the position for the new property node
-      const bottomRightX = window.innerWidth - 370;
-      const bottomRightY = window.innerHeight - 100;
+      const bottomRightX = window.innerWidth - 370; // Adjusted to account for the wider Property Panel
+      const bottomRightY = window.innerHeight - 100; // Y position for the bottom of the screen, with some padding
 
       // Add new property node at the bottom
       const newPropertyNode = {
-        id: newPropertyId,
+        id: `property-${properties.length}`,
         type: "property",
         data: {
           label: name,
           selectedType: type,
           onChange: handlePropertyTypeChange,
-          id: newPropertyId,
-          value: "",
+          id: `property-${properties.length}`,
         },
         position: {
           x: bottomRightX,
@@ -966,10 +960,28 @@ const App = () => {
           border: "1px solid #ddd",
           borderRadius: "15px",
         },
-        draggable: true,
+        draggable: false,
       };
 
-      setNodes((prevNodes) => [...prevNodes, newPropertyNode]);
+      // Adjust positions of existing property nodes
+      setNodes((nodes) => {
+        const propertyNodes = nodes.filter((node) => node.type === "property");
+        const updatedNodes = nodes.map((node) => {
+          if (node.type === "property") {
+            return {
+              ...node,
+              position: {
+                x: node.position.x,
+                y: node.position.y - propertyNodeHeight - propertyNodeSpacing, // Increased spacing
+              },
+            };
+          }
+          return node;
+        });
+
+        // Add the new node at the bottom
+        return [...updatedNodes, newPropertyNode];
+      });
 
       // Check if the new node is invisible, out of view, or hidden below the pane
       setTimeout(() => {
@@ -1023,24 +1035,21 @@ const App = () => {
     ]
   );
 
-  const updateProperty = (id, name, type, value) => {
-    setProperties((prevProperties) =>
-      prevProperties.map((prop) =>
-        prop.id === id ? { ...prop, name, type, value } : prop
-      )
-    );
+  const updateProperty = (index, name, type) => {
+    const updatedProperties = [...properties];
+    updatedProperties[index] = { name, type };
+    setProperties(updatedProperties);
 
     // Update property node on the canvas
     setNodes((nodes) =>
       nodes.map((node) => {
-        if (node.id === id) {
+        if (node.id === `property-${index}`) {
           return {
             ...node,
             data: {
               ...node.data,
               label: name,
               selectedType: type,
-              value: value,
             },
             style: {
               ...node.style,
@@ -1053,31 +1062,38 @@ const App = () => {
     );
   };
 
-  const deleteProperty = useCallback(
-    (id) => {
-      // Remove the property from the properties state
-      setProperties((prevProperties) =>
-        prevProperties.filter((prop) => prop.id !== id)
+  const deleteProperty = (index) => {
+    const updatedProperties = properties.filter((_, i) => i !== index);
+    setProperties(updatedProperties);
+
+    setNodes((nodes) => {
+      const updatedNodes = nodes.filter(
+        (node) => node.id !== `property-${index}`
       );
 
-      // Remove the node from the canvas
-      setNodes((prevNodes) => prevNodes.filter((node) => node.id !== id));
-
-      // Remove any edges connected to the deleted property node
-      setEdges((prevEdges) =>
-        prevEdges.filter((edge) => edge.source !== id && edge.target !== id)
-      );
-
-      // Optionally, reposition remaining property nodes
-      // ... (repositioning logic)
-
-      // Optionally, fit view after deletion
-      setTimeout(() => {
-        fitView({ padding: 0.2 });
-      }, 50);
-    },
-    [setNodes, setEdges, setProperties, fitView]
-  );
+      // Reposition remaining property nodes
+      const bottomRightY = window.innerHeight - 100;
+      return updatedNodes.map((node) => {
+        if (node.type === "property") {
+          const nodeIndex = updatedNodes
+            .filter((n) => n.type === "property")
+            .findIndex((n) => n.id === node.id);
+          return {
+            ...node,
+            position: {
+              x: node.position.x,
+              y:
+                bottomRightY -
+                (updatedNodes.filter((n) => n.type === "property").length -
+                  nodeIndex) *
+                  (propertyNodeHeight + propertyNodeSpacing),
+            },
+          };
+        }
+        return node;
+      });
+    });
+  };
 
   const propertyNodeRightEdge = 1550; // Assuming property nodes end at x=1550
   const psetNodeWidth = 200;
@@ -1132,7 +1148,6 @@ const App = () => {
         data: {
           name,
           onChange: handlePropertySetNameChange,
-          id: `property-set-${Date.now()}`,
         },
         position: {
           x: baseX + column * (psetNodeWidth + psetColumnSpacing),
@@ -1184,84 +1199,6 @@ const App = () => {
     ]
   );
 
-  const deletePropertySet = useCallback(
-    (id) => {
-      setNodes((prevNodes) => {
-        const updatedNodes = prevNodes.filter((node) => node.id !== id);
-
-        // Reposition remaining property set nodes
-        const psetNodes = updatedNodes.filter(
-          (node) => node.type === "propertySet"
-        );
-        const baseX = propertyNodeRightEdge + 200;
-        const baseY = 50;
-        const columnHeight = 5;
-
-        return updatedNodes.map((node) => {
-          if (node.type === "propertySet") {
-            const nodeIndex = psetNodes.findIndex((n) => n.id === node.id);
-            const column = Math.floor(nodeIndex / columnHeight);
-            const row = nodeIndex % columnHeight;
-            return {
-              ...node,
-              position: {
-                x: baseX + column * (psetNodeWidth + psetColumnSpacing),
-                y: baseY + row * (psetNodeHeight + psetNodeSpacing),
-              },
-            };
-          }
-          return node;
-        });
-      });
-
-      // Remove any edges connected to the deleted property set node
-      setEdges((prevEdges) =>
-        prevEdges.filter((edge) => edge.source !== id && edge.target !== id)
-      );
-    },
-    [
-      setNodes,
-      setEdges,
-      propertyNodeRightEdge,
-      psetNodeWidth,
-      psetNodeHeight,
-      psetNodeSpacing,
-      psetColumnSpacing,
-    ]
-  );
-
-  const onNodesDelete = useCallback(
-    (deletedNodes) => {
-      deletedNodes.forEach((node) => {
-        if (node.type === "property") {
-          deleteProperty(node.id);
-        } else if (node.type === "propertySet") {
-          deletePropertySet(node.id);
-        }
-      });
-    },
-    [deleteProperty, deletePropertySet]
-  );
-
-  // Move nodeTypes inside the App component
-  const nodeTypes = useMemo(
-    () => ({
-      custom: CustomNode,
-      property: (props) => (
-        <PropertyNode {...props} deleteProperty={deleteProperty} />
-      ),
-      propertySet: (props) => (
-        <PropertySetNode {...props} deletePropertySet={deletePropertySet} />
-      ),
-    }),
-    [deleteProperty, deletePropertySet]
-  );
-
-  const edgeTypes = {
-    default: EdgeWithButton,
-    custom: CustomEdge,
-  };
-
   return (
     <div style={{ height: "100vh", width: "100%" }}>
       <ReactFlow
@@ -1274,24 +1211,26 @@ const App = () => {
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodesDelete={onNodesDelete}
         fitView
         nodesConnectable={true}
         edgesUpdatable={true}
         elementsSelectable={true}
         deleteKeyCode={["Backspace", "Delete"]}
-        defaultEdgeOptions={{
-          style: { strokeWidth: 3, stroke: "#888" },
-          type: "default",
-        }}
         onEdgeUpdate={(oldEdge, newConnection) => {
-          // ... (rest of the onEdgeUpdate logic)
+          // Prevent updating edges that connect property to PropertySet
+          if (
+            nodes.find((n) => n.id === oldEdge.source)?.type === "property" &&
+            nodes.find((n) => n.id === oldEdge.target)?.type === "propertySet"
+          ) {
+            return;
+          }
+          setEdges((els) => updateEdge(oldEdge, newConnection, els));
         }}
         onEdgeUpdateStart={(_, edge) => {
-          // ... (rest of the onEdgeUpdateStart logic)
+          // Optionally, you can add logic here to prevent dragging certain edges
         }}
         onEdgeUpdateEnd={(_, edge) => {
-          // ... (rest of the onEdgeUpdateEnd logic)
+          // Optionally, you can add logic here after an edge update ends
         }}
       >
         <Background />
@@ -1370,4 +1309,88 @@ const AppWrapper = () => (
 
 export default AppWrapper;
 
-// Styles have been moved to the CSS file
+// Add or update these styles in your CSS
+const styles = `
+  .sidebar-panel {
+    background-color: #f0f4f8;
+    border-radius: 5px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    z-index: 5;
+  }
+
+  .property-panel {
+    background-color: #f0f8f4;
+  }
+
+  .propertyset-panel {
+    background-color: #f8f4f0;
+  }
+
+  .sidebar-panel.collapsed {
+    width: auto !important;
+    overflow: visible !important;
+  }
+
+  .sidebar-panel.collapsed .panel-header,
+  .sidebar-panel.collapsed .sidebar-content {
+    display: none;
+  }
+
+  .sidebar-tab {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    background-color: #e0e8f0;
+    border-radius: 5px;
+  }
+
+  .sidebar-tab span {
+    margin-left: 10px;
+    font-weight: bold;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    white-space: nowrap;
+    background-color: #d0d8e0;
+    border-radius: 5px 5px 0 0;
+  }
+
+  .sidebar-content {
+    padding: 10px;
+  }
+
+  .upload-button {
+    margin-top: 10px;
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  .upload-button:hover {
+    background-color: #357abd;
+  }
+
+  /* Ensure horizontal orientation in collapsed state */
+  .sidebar-panel.collapsed .sidebar-tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    width: auto;
+  }
+
+  /* ... (rest of your existing styles) */
+`;
+
+// Add this style tag to your component or include it in your CSS file
+const styleTag = document.createElement("style");
+styleTag.textContent = styles;
+document.head.appendChild(styleTag);
