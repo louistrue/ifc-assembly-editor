@@ -1,0 +1,4 @@
+index,material,thickness,properties
+0,Concrete,200,PropertyA
+1,Insulation,100,PropertyB
+2,Wood,50,PropertyC
