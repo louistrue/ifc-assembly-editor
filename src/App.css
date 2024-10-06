@@ -653,21 +653,240 @@ input:checked + .slider:before {
   border-radius: 10px;
   font-weight: bold;
   color: white;
-  width: 100%;
-  height: 100%;
+  width: 200px;
+  height: 60px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
+  cursor: move;
+  transition: all 0.3s ease;
+  position: relative;
+  user-select: none;
 }
 
 .property-set-content {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.property-set-name {
+.property-set-name,
+.property-set-name-input {
   font-size: 14px;
   word-break: break-word;
+  width: 80%;
+  background: transparent;
+  border: none;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px;
+}
+
+.property-set-name-input:focus {
+  outline: none;
+  border-bottom: 1px solid white;
+}
+
+.property-set-color-container {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+}
+
+.property-set-color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.delete-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(255, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+  z-index: 10; /* Ensure it's above other elements */
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 0, 0, 1);
+}
+
+.property-set-color-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.property-set-node {
+  /* ... existing styles ... */
+  position: relative;
+}
+
+.color-picker-wrapper {
+  position: absolute;
+  bottom: 40px;
+  right: 0;
+  z-index: 10;
+}
+
+.property-set-color-label {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.property-set-color-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.property-set-node:hover .property-set-color-swatch,
+.property-set-node:focus-within .property-set-color-swatch {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles for react-colorful */
+.react-colorful {
+  width: 150px !important;
+  height: 150px !important;
+}
+
+.react-colorful__saturation {
+  border-radius: 4px 4px 0 0;
+}
+
+.react-colorful__hue {
+  height: 20px;
+  border-radius: 0 0 4px 4px;
+}
+
+.react-colorful__saturation-pointer,
+.react-colorful__hue-pointer {
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+
+.react-flow__edge-path.animated {
+  animation: dashdraw 0.5s linear infinite;
+}
+
+.delete-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(255, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+  z-index: 10; /* Ensure it's above other elements */
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 0, 0, 1);
+}
+
+.property-set-node {
+  position: relative;
+}
+
+.property-set-node {
+  /* ... existing styles ... */
+  position: relative;
+}
+
+.color-picker-wrapper {
+  position: absolute;
+  bottom: 40px;
+  right: 0;
+  z-index: 10;
+}
+
+.property-set-color-label {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.property-set-color-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.property-set-node:hover .property-set-color-swatch,
+.property-set-node:focus-within .property-set-color-swatch {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles for react-colorful */
+.react-colorful {
+  width: 150px !important;
+  height: 150px !important;
+}
+
+.react-colorful__saturation {
+  border-radius: 4px 4px 0 0;
+}
+
+.react-colorful__hue {
+  height: 20px;
+  border-radius: 0 0 4px 4px;
+}
+
+.react-colorful__saturation-pointer,
+.react-colorful__hue-pointer {
+  width: 20px;
+  height: 20px;
 }
 
 .propertyset-panel {
@@ -777,23 +996,25 @@ input:checked + .slider:before {
 
 .delete-button {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  background-color: #ff4d4d;
+  bottom: 5px;
+  right: 30px;
+  background-color: rgba(255, 0, 0, 0.7);
   color: white;
   border: none;
   border-radius: 50%;
   width: 20px;
   height: 20px;
-  font-size: 12px;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.3s ease;
 }
 
 .delete-button:hover {
-  background-color: #ff1a1a;
+  background-color: rgba(255, 0, 0, 1);
 }
 
 .property-set-name-input {
@@ -809,4 +1030,305 @@ input:checked + .slider:before {
 .property-set-name-input:focus {
   outline: none;
   border-bottom: 1px solid white;
+}
+
+.property-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.property-item > div,
+.property-item > input[type="text"] {
+  flex-grow: 1;
+  margin-right: 5px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+
+.property-item > div:hover {
+  background-color: #f0f0f0;
+  cursor: pointer;
+}
+
+.property-item > input[type="text"] {
+  border-color: #ccc;
+  outline: none;
+}
+
+.property-item > input[type="text"]:focus {
+  border-color: #4a90e2;
+}
+
+/* Add or update these styles for PropertySet nodes */
+.property-set-node {
+  padding: 10px;
+  border-radius: 10px;
+  font-weight: bold;
+  color: white;
+  width: 200px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  user-select: none;
+}
+
+.property-set-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.property-set-color-label {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.property-set-color-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.property-set-node:hover .property-set-color-swatch,
+.property-set-node:focus-within .property-set-color-swatch {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.color-picker-wrapper {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  z-index: 1000;
+  margin-bottom: 5px;
+}
+
+.delete-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(255, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 0, 0, 1);
+}
+
+/* Styles for react-colorful */
+.react-colorful {
+  width: 150px !important;
+  height: 150px !important;
+}
+
+.react-colorful__saturation {
+  border-radius: 4px 4px 0 0;
+}
+
+.react-colorful__hue {
+  height: 20px;
+  border-radius: 0 0 4px 4px;
+}
+
+.react-colorful__saturation-pointer,
+.react-colorful__hue-pointer {
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+
+.react-flow__edge-path.animated {
+  animation: dashdraw 0.5s linear infinite;
+}
+
+.delete-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(255, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 0, 0, 1);
+}
+
+.property-set-node {
+  position: relative;
+}
+
+.property-set-node {
+  /* ... existing styles ... */
+  position: relative;
+}
+
+.color-picker-wrapper {
+  position: absolute;
+  bottom: 40px;
+  right: 0;
+  z-index: 10;
+}
+
+.property-set-color-label {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.property-set-color-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.property-set-node:hover .property-set-color-swatch,
+.property-set-node:focus-within .property-set-color-swatch {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles for react-colorful */
+.react-colorful {
+  width: 150px !important;
+  height: 150px !important;
+}
+
+.react-colorful__saturation {
+  border-radius: 4px 4px 0 0;
+}
+
+.react-colorful__hue {
+  height: 20px;
+  border-radius: 0 0 4px 4px;
+}
+
+.react-colorful__saturation-pointer,
+.react-colorful__hue-pointer {
+  width: 20px;
+  height: 20px;
+}
+
+.property-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.property-item input[type="text"],
+.property-item select {
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.property-item input[type="text"] {
+  width: 30%;
+  margin-right: 5px;
+}
+
+.property-item select {
+  width: 30%;
+  margin-right: 5px;
+}
+
+.property-item input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+.property-item button {
+  padding: 2px 5px;
+  font-size: 12px;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.add-property {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.add-property input,
+.add-property select {
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.add-property input {
+  width: 40%;
+  margin-right: 5px;
+}
+
+.add-property select {
+  width: 30%;
+  margin-right: 5px;
+}
+
+.add-button {
+  padding: 5px 10px;
+  font-size: 14px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.property-set-node.editing {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(0, 0, 0, 0.1);
 }

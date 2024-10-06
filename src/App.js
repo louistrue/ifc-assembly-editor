@@ -1,30 +1,30 @@
-// src/App.js
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import ReactFlow, {
   Background,
   Controls,
   Panel,
-  useNodesState,
-  useEdgesState,
   addEdge,
   Handle,
   Position,
   useReactFlow,
-  ReactFlowProvider, // Add this import
+  ReactFlowProvider,
   getBezierPath,
-  MarkerType,
-  updateEdge,
 } from "reactflow";
-import "reactflow/dist/style.css"; // Import ReactFlow styles
+import "reactflow/dist/style.css";
 import "./App.css";
 import {
-  FaTools,
   FaList,
   FaThumbtack,
   FaTimes as RemoveIcon,
   FaLayerGroup,
-  FaUpload, // Add this line
-} from "react-icons/fa"; // Add FaList import
+  FaUpload,
+} from "react-icons/fa";
 
 const CustomNode = ({ data }) => {
   return (
@@ -38,7 +38,11 @@ const CustomNode = ({ data }) => {
       }}
     >
       {data.label}
-      <Handle type="source" position={Position.Right} id="right" />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ width: "12px", height: "12px" }}
+      />
     </div>
   );
 };
@@ -48,6 +52,12 @@ const PropertyNode = ({ data }) => {
   const [localValue, setLocalValue] = useState(data.value || "");
   const [isEditing, setIsEditing] = useState(false);
   const [previousValues, setPreviousValues] = useState({});
+
+  // Use useEffect to update local state when props change
+  useEffect(() => {
+    setLocalLabel(data.label);
+    setLocalValue(data.value || "");
+  }, [data.label, data.value]);
 
   const handleNameChange = (event) => {
     setLocalLabel(event.target.value);
@@ -63,7 +73,6 @@ const PropertyNode = ({ data }) => {
       newValue = parseFloat(newValue);
     }
     setLocalValue(newValue);
-    data.onChange(data.id, localLabel, data.selectedType, newValue);
   };
 
   const handleNameBlur = () => {
@@ -73,8 +82,7 @@ const PropertyNode = ({ data }) => {
 
   const handleNameKeyDown = (event) => {
     if (event.key === "Enter") {
-      data.onChange(data.id, localLabel, data.selectedType, localValue);
-      setIsEditing(false);
+      handleNameBlur();
     }
   };
 
@@ -151,7 +159,14 @@ const PropertyNode = ({ data }) => {
 
   return (
     <div className="property-node">
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          width: "12px",
+          height: "12px",
+        }}
+      />
       <div className="property-content">
         <div className="property-header">
           {isEditing ? (
@@ -185,7 +200,14 @@ const PropertyNode = ({ data }) => {
         </div>
         <div className="property-value">{renderValueInput()}</div>
       </div>
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          width: "12px",
+          height: "12px",
+        }}
+      />
     </div>
   );
 };
@@ -193,6 +215,16 @@ const PropertyNode = ({ data }) => {
 const PropertySetNode = ({ data }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localName, setLocalName] = useState(data.name);
+  const [localColor, setLocalColor] = useState(data.color);
+  const inputRef = useRef(null);
+  const colorRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   const handleDoubleClick = () => {
     setIsEditing(true);
@@ -202,35 +234,87 @@ const PropertySetNode = ({ data }) => {
     setLocalName(event.target.value);
   };
 
-  const handleNameBlur = () => {
-    data.onChange(data.id, localName);
+  const handleColorChange = (event) => {
+    const newColor = event.target.value;
+    setLocalColor(newColor);
+    data.onChange(data.id, localName, newColor);
+  };
+
+  const handleBlur = () => {
+    if (localName.trim() !== "") {
+      data.onChange(data.id, localName, localColor);
+    } else {
+      setLocalName(data.name);
+      setLocalColor(data.color);
+    }
     setIsEditing(false);
   };
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
-      handleNameBlur();
+      handleBlur();
+    } else if (event.key === "Escape") {
+      setLocalName(data.name);
+      setLocalColor(data.color);
+      setIsEditing(false);
     }
   };
 
+  const openColorPicker = (event) => {
+    event.stopPropagation();
+    colorRef.current.click();
+  };
+
+  const handleDelete = (event) => {
+    event.stopPropagation();
+    data.onDelete(data.id);
+  };
+
   return (
-    <div className="property-set-node" onDoubleClick={handleDoubleClick}>
-      <Handle type="target" position={Position.Left} />
+    <div
+      className={`property-set-node ${isEditing ? "editing" : ""}`}
+      onDoubleClick={handleDoubleClick}
+      style={{ backgroundColor: localColor }}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ width: "12px", height: "12px" }}
+      />
       <div className="property-set-content">
         {isEditing ? (
           <input
+            ref={inputRef}
             type="text"
             value={localName}
             onChange={handleNameChange}
-            onBlur={handleNameBlur}
+            onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            autoFocus
             className="property-set-name-input"
           />
         ) : (
-          <div className="property-set-name">{data.name}</div>
+          <div className="property-set-name">{localName}</div>
         )}
       </div>
+      <div className="property-set-color-container">
+        <input
+          ref={colorRef}
+          type="color"
+          value={localColor}
+          onChange={handleColorChange}
+          className="property-set-color-input"
+        />
+        <div
+          className="property-set-color-dot"
+          style={{ backgroundColor: localColor }}
+          onClick={openColorPicker}
+        ></div>
+      </div>
+      {isEditing && (
+        <button className="delete-button" onClick={handleDelete}>
+          ×
+        </button>
+      )}
     </div>
   );
 };
@@ -301,6 +385,7 @@ const CustomEdge = ({
   targetPosition,
   style = {},
   data,
+  animated,
 }) => {
   const [edgePath] = getBezierPath({
     sourceX,
@@ -330,9 +415,9 @@ const CustomEdge = ({
           strokeWidth: 2,
           stroke: "#888",
           fill: "none",
-          strokeDasharray: "5,5",
+          strokeDasharray: animated ? "5,5" : "none",
         }}
-        className="react-flow__edge-path"
+        className={`react-flow__edge-path ${animated ? "animated" : ""}`}
         d={edgePath}
       />
       <foreignObject
@@ -357,7 +442,7 @@ const CustomEdge = ({
 const nodeTypes = {
   custom: CustomNode,
   property: PropertyNode,
-  propertySet: (props) => <PropertySetNode {...props} />,
+  propertySet: PropertySetNode,
 };
 
 const edgeTypes = {
@@ -560,23 +645,388 @@ const PropertySetPanel = ({ addPropertySet, isFixed, setIsFixed }) => {
   );
 };
 
+// Add this new component before the App component
+const UploadPanel = ({ isFixed, setIsFixed }) => {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const panelRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    setIsCollapsed(false);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isFixed) {
+      setTimeout(() => setIsCollapsed(true), 400);
+    }
+  };
+
+  const handleUpload = () => {
+    // Implement your upload logic here
+    console.log("Upload button clicked");
+  };
+
+  return (
+    <Panel
+      position="top-left"
+      className={`upload-panel ${isCollapsed && !isFixed ? "collapsed" : ""}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      ref={panelRef}
+    >
+      {!isCollapsed && (
+        <>
+          <div className="panel-header">
+            <h3>Upload IFC:</h3>
+            <label className="fix-checkbox">
+              <input
+                type="checkbox"
+                checked={isFixed}
+                onChange={() => setIsFixed(!isFixed)}
+              />
+              <FaThumbtack size={16} />
+            </label>
+          </div>
+          <div className="upload-content">
+            <button className="upload-button" onClick={handleUpload}>
+              <FaUpload size={16} style={{ marginRight: "8px" }} />
+              Upload IFC File
+            </button>
+          </div>
+        </>
+      )}
+      <div className="upload-tab">
+        <FaUpload size={20} />
+        <span>Upload</span>
+      </div>
+    </Panel>
+  );
+};
+
 const App = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Sidebar collapse state
-  const [properties, setProperties] = useState([]); // New state for properties
-  const nodeHeightOffset = 5; // Offset for stacking the nodes
-  const propertyNodeHeight = 100; // Increased height for property nodes
-  const propertyNodeWidth = 300; // Increased width for property nodes
-  const propertyNodeSpacing = 40; // Increased spacing between property nodes
-  const [sidebarCollapseTimer, setSidebarCollapseTimer] = useState(null);
-  const [isSidebarFixed, setIsSidebarFixed] = useState(false);
+  const [appState, setAppState] = useState({
+    layers: [],
+    properties: [],
+    propertySets: [],
+    edges: [],
+  });
   const [isPropertyPanelFixed, setIsPropertyPanelFixed] = useState(false);
   const [isPropertySetPanelFixed, setIsPropertySetPanelFixed] = useState(false);
+  const [isUploadPanelFixed, setIsUploadPanelFixed] = useState(false);
 
-  // Add this line to get access to ReactFlow's utility functions
-  const { fitView, getNodes, getViewport } = useReactFlow();
+  const { fitView } = useReactFlow();
 
+  const nodeHeightOffset = 5;
+  const propertyNodeHeight = 100;
+  const propertyNodeWidth = 300;
+  const propertyNodeSpacing = 40;
+
+  const updateAppState = useCallback((updater) => {
+    setAppState((prevState) => {
+      const newState = updater(prevState);
+      return newState;
+    });
+  }, []);
+
+  const handlePropertyTypeChange = useCallback(
+    (nodeId, newName, newType, newValue) => {
+      updateAppState((prevState) => {
+        const updatedProperties = prevState.properties.map((prop) =>
+          prop.id === nodeId
+            ? { ...prop, name: newName, type: newType, value: newValue }
+            : prop
+        );
+        return { ...prevState, properties: updatedProperties };
+      });
+    },
+    [updateAppState]
+  );
+
+  const addProperty = useCallback(
+    (name, type) => {
+      const newPropertyId = `property-${Date.now()}`;
+      updateAppState((prevState) => {
+        const newProperty = { id: newPropertyId, name, type, value: "" };
+        const newState = {
+          ...prevState,
+          properties: [...prevState.properties, newProperty],
+        };
+
+        // Use setTimeout to ensure the node is added before we try to fit the view
+        setTimeout(() => {
+          fitView({ padding: 0.2, includeHiddenNodes: false });
+        }, 50);
+
+        return newState;
+      });
+    },
+    [updateAppState, fitView]
+  );
+
+  const deleteProperty = useCallback(
+    (id) => {
+      updateAppState((prevState) => ({
+        ...prevState,
+        properties: prevState.properties.filter((prop) => prop.id !== id),
+        edges: prevState.edges.filter(
+          (edge) => edge.source !== id && edge.target !== id
+        ),
+      }));
+    },
+    [updateAppState]
+  );
+
+  const getPropertySetNodeColor = () => {
+    const colors = [
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#FFA07A",
+      "#6A0572",
+      "#F7DC6F",
+      "#BB8FCE",
+      "#2ECC71",
+      "#E74C3C",
+      "#3498DB",
+      "#9B59B6",
+      "#F39C12",
+      "#1ABC9C",
+      "#34495E",
+      "#16A085",
+      "#27AE60",
+      "#2980B9",
+      "#8E44AD",
+      "#F1C40F",
+      "#E67E22",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const addPropertySet = useCallback(
+    (name) => {
+      const newPropertySetId = `propertyset-${Date.now()}`;
+      updateAppState((prevState) => {
+        const newState = {
+          ...prevState,
+          propertySets: [
+            ...prevState.propertySets,
+            {
+              id: newPropertySetId,
+              name,
+              color: getPropertySetNodeColor(),
+              position: { x: 1800, y: prevState.propertySets.length * 100 },
+            },
+          ],
+        };
+
+        // Use setTimeout to ensure the node is added before we try to fit the view
+        setTimeout(() => {
+          fitView({ padding: 0.2, includeHiddenNodes: false });
+        }, 50);
+
+        return newState;
+      });
+    },
+    [updateAppState, fitView]
+  );
+
+  const removeEdge = useCallback(
+    (edgeId) => {
+      updateAppState((prevState) => {
+        const edgeToRemove = prevState.edges.find((edge) => edge.id === edgeId);
+        if (
+          edgeToRemove &&
+          edgeToRemove.source.startsWith("property-") &&
+          edgeToRemove.target.startsWith("propertyset-")
+        ) {
+          const updatedProperties = prevState.properties.map((prop) =>
+            prop.id === edgeToRemove.source
+              ? { ...prop, propertySetId: null, isConnected: false }
+              : prop
+          );
+          return {
+            ...prevState,
+            edges: prevState.edges.filter((edge) => edge.id !== edgeId),
+            properties: updatedProperties,
+          };
+        }
+        // For other edge types (including property-to-layer), just remove the edge
+        return {
+          ...prevState,
+          edges: prevState.edges.filter((edge) => edge.id !== edgeId),
+        };
+      });
+    },
+    [updateAppState]
+  );
+
+  const onConnect = useCallback(
+    (params) => {
+      // Prevent direct connections between material (layer) nodes and property set nodes
+      if (
+        (params.source.startsWith("layer-") &&
+          params.target.startsWith("propertyset-")) ||
+        (params.source.startsWith("propertyset-") &&
+          params.target.startsWith("layer-"))
+      ) {
+        return; // Don't create the connection
+      }
+
+      const newEdge = {
+        ...params,
+        type: "custom",
+        animated: true,
+        style: { stroke: "grey" },
+        data: { removeEdge },
+      };
+
+      // Allow connections from layer nodes to property nodes
+      if (
+        params.source.startsWith("layer-") &&
+        params.target.startsWith("property-")
+      ) {
+        updateAppState((prevState) => ({
+          ...prevState,
+          edges: addEdge(newEdge, prevState.edges),
+        }));
+      } else if (params.source.startsWith("property-")) {
+        if (params.target.startsWith("propertyset-")) {
+          // Property to PropertySet connection
+          updateAppState((prevState) => {
+            const isAlreadyConnected = prevState.edges.some(
+              (edge) =>
+                edge.source === params.source &&
+                edge.target.startsWith("propertyset-")
+            );
+
+            if (isAlreadyConnected) {
+              return prevState;
+            }
+
+            const updatedProperties = prevState.properties.map((prop) =>
+              prop.id === params.source ? { ...prop, isConnected: true } : prop
+            );
+
+            return {
+              ...prevState,
+              edges: addEdge(newEdge, prevState.edges),
+              properties: updatedProperties,
+            };
+          });
+        } else {
+          // Property to any other node type (including layers)
+          updateAppState((prevState) => ({
+            ...prevState,
+            edges: addEdge(newEdge, prevState.edges),
+          }));
+        }
+      } else {
+        // Any other connection type
+        updateAppState((prevState) => ({
+          ...prevState,
+          edges: addEdge(newEdge, prevState.edges),
+        }));
+      }
+    },
+    [updateAppState, removeEdge]
+  );
+
+  const handlePropertySetNameChange = useCallback(
+    (nodeId, newName, newColor) => {
+      updateAppState((prevState) => ({
+        ...prevState,
+        propertySets: prevState.propertySets.map((pset) =>
+          pset.id === nodeId
+            ? { ...pset, name: newName, color: newColor }
+            : pset
+        ),
+      }));
+    },
+    [updateAppState]
+  );
+
+  const deletePropertySet = useCallback(
+    (id) => {
+      updateAppState((prevState) => ({
+        ...prevState,
+        propertySets: prevState.propertySets.filter((pset) => pset.id !== id),
+        edges: prevState.edges.filter(
+          (edge) => edge.target !== id && edge.source !== id
+        ),
+      }));
+    },
+    [updateAppState]
+  );
+
+  const handleNodeDrag = useCallback(
+    (event, draggedNode) => {
+      if (draggedNode.type !== "custom") return; // Only allow dragging of custom (layer) nodes
+
+      updateAppState((prevState) => {
+        const layers = prevState.layers.slice();
+        const draggedLayerIndex = layers.findIndex(
+          (layer) => layer.id === draggedNode.id
+        );
+
+        if (draggedLayerIndex === -1) return prevState;
+
+        const draggedLayer = layers[draggedLayerIndex];
+        const draggedNodeCentroid =
+          draggedNode.position.y + parseInt(draggedLayer.thickness) / 2;
+
+        let newIndex = draggedLayerIndex;
+        let totalHeight = 0;
+
+        for (let i = 0; i < layers.length; i++) {
+          const layerHeight = parseInt(layers[i].thickness);
+          const layerMidpoint = totalHeight + layerHeight / 2;
+
+          if (i !== draggedLayerIndex) {
+            if (
+              (draggedLayerIndex < i && draggedNodeCentroid > layerMidpoint) ||
+              (draggedLayerIndex > i && draggedNodeCentroid < layerMidpoint)
+            ) {
+              newIndex = i;
+              break;
+            }
+          }
+
+          totalHeight += layerHeight + nodeHeightOffset;
+        }
+
+        if (newIndex !== draggedLayerIndex) {
+          // Move the dragged layer
+          layers.splice(draggedLayerIndex, 1);
+          layers.splice(newIndex, 0, draggedLayer);
+
+          // Update layer positions
+          let yOffset = 0;
+          layers.forEach((layer, index) => {
+            layer.yOffset = yOffset;
+            yOffset += parseInt(layer.thickness) + nodeHeightOffset;
+          });
+        }
+
+        return { ...prevState, layers };
+      });
+    },
+    [updateAppState, nodeHeightOffset]
+  );
+
+  const handleNodeDragStop = useCallback(
+    (event, node) => {
+      if (node.type === "propertySet") {
+        updateAppState((prevState) => ({
+          ...prevState,
+          propertySets: prevState.propertySets.map((pset) =>
+            pset.id === node.id ? { ...pset, position: node.position } : pset
+          ),
+        }));
+      }
+    },
+    [updateAppState]
+  );
+
+  // Move utility functions here, before they are used
   const getMaterialColor = (material) => {
     switch (material) {
       case "Concrete":
@@ -615,600 +1065,111 @@ const App = () => {
       case "IfcIdentifier":
         return "#E6BAFF";
       case "IfcClassification":
-        return "#C7CEEA"; // Light blue color for IfcClassification
+        return "#C7CEEA";
       default:
         return "#F0F0F0";
     }
   };
 
-  const handlePropertyTypeChange = useCallback(
-    (nodeId, newName, newType, newValue) => {
-      setNodes((prevNodes) =>
-        prevNodes.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  label: newName,
-                  selectedType: newType,
-                  value: newValue,
-                },
-                style: {
-                  ...node.style,
-                  backgroundColor: getPropertyNodeColor(newType),
-                },
-              }
-            : node
-        )
-      );
-
-      // Update the properties state as well
-      setProperties((prevProperties) =>
-        prevProperties.map((prop, index) =>
-          `property-${index}` === nodeId
-            ? { name: newName, type: newType, value: newValue }
-            : prop
-        )
-      );
-    },
-    [setNodes, setProperties]
-  );
-
-  const generateNodes = useCallback(
-    (data) => {
-      const layerNodes = [];
-      const propertyNodes = [];
-      let yOffset = 0;
-
-      data.forEach((layer, index) => {
-        const layerHeight = parseInt(layer.thickness);
-
-        const layerNode = {
-          id: `layer-${layer.index}`,
-          type: "custom",
-          data: {
-            label: `${layer.material} (${layer.thickness}mm)`,
-            selectedType: "Type1", // Default selected type
-          },
-          position: { x: 0, y: yOffset },
-          style: {
-            width: 1000,
-            height: layerHeight,
-            backgroundColor: getMaterialColor(layer.material),
-            border: "1px solid #ddd",
-          },
-          draggable: true, // Add this line
-        };
-        layerNodes.push(layerNode);
-
-        yOffset += layerHeight + nodeHeightOffset;
-      });
-
-      // Add property nodes
-      properties.forEach((prop, index) => {
-        const propertyNode = {
-          id: `property-${index}`,
-          type: "property",
-          data: {
-            label: prop.name,
-            selectedType: prop.type,
-            onChange: handlePropertyTypeChange,
-            id: `property-${index}`,
-          },
-          position: {
-            x: 1250,
-            y: index * (propertyNodeHeight + propertyNodeSpacing), // Increased spacing
-          },
-          style: {
-            width: propertyNodeWidth,
-            height: propertyNodeHeight,
-            backgroundColor: getPropertyNodeColor(prop.type),
-            border: "1px solid #ddd",
-            borderRadius: "15px",
-          },
-          draggable: false,
-        };
-        propertyNodes.push(propertyNode);
-      });
-
-      return { nodes: [...layerNodes, ...propertyNodes], edges: [] };
-    },
-    [
-      nodeHeightOffset,
-      propertyNodeHeight,
-      propertyNodeWidth,
-      propertyNodeSpacing,
-      handlePropertyTypeChange,
-      properties,
-    ]
-  );
-
-  // Update the sidebar collapse handlers
-  const handleSidebarMouseEnter = () => {
-    if (sidebarCollapseTimer) clearTimeout(sidebarCollapseTimer);
-    setIsSidebarCollapsed(false);
-  };
-
-  const handleSidebarMouseLeave = () => {
-    if (!isSidebarFixed) {
-      const timer = setTimeout(() => setIsSidebarCollapsed(true), 400);
-      setSidebarCollapseTimer(timer);
-    }
-  };
-
-  // Load the JSON data and initialize nodes and edges
+  // Load initial data
   useEffect(() => {
     fetch("/layers.json")
       .then((response) => response.json())
       .then((data) => {
-        const generatedNodes = generateNodes(data);
-        setNodes(generatedNodes.nodes);
-        setEdges(generatedNodes.edges);
-      });
-  }, [generateNodes, setNodes, setEdges]);
-
-  // Helper function to calculate the centroid (middle Y-position) of a node
-  const getCentroid = (node) => {
-    const layerHeight = parseInt(node.style.height);
-    return node.position.y + layerHeight / 2;
-  };
-
-  // Handle node dragging with swapping behavior based on centroid
-  const handleNodeDrag = useCallback(
-    (event, draggedNode) => {
-      if (draggedNode.type !== "custom") return; // Only allow dragging of custom (layer) nodes
-
-      setNodes((prevNodes) => {
-        const materialNodes = prevNodes.filter((n) => n && n.type === "custom");
-        const draggedNodeIndex = materialNodes.findIndex(
-          (n) => n && n.id === draggedNode.id
-        );
-
-        if (draggedNodeIndex === -1) return prevNodes;
-
-        const draggedNodeCentroid = getCentroid(draggedNode);
-
-        let updatedNodes = [...materialNodes];
-
-        if (draggedNodeIndex > 0) {
-          const aboveNode = updatedNodes[draggedNodeIndex - 1];
-          if (aboveNode) {
-            const aboveNodeCentroid = getCentroid(aboveNode);
-
-            if (draggedNodeCentroid < aboveNodeCentroid) {
-              [
-                updatedNodes[draggedNodeIndex - 1],
-                updatedNodes[draggedNodeIndex],
-              ] = [
-                updatedNodes[draggedNodeIndex],
-                updatedNodes[draggedNodeIndex - 1],
-              ];
-            }
-          }
-        }
-
-        if (draggedNodeIndex < updatedNodes.length - 1) {
-          const belowNode = updatedNodes[draggedNodeIndex + 1];
-          if (belowNode) {
-            const belowNodeCentroid = getCentroid(belowNode);
-
-            if (draggedNodeCentroid > belowNodeCentroid) {
-              [
-                updatedNodes[draggedNodeIndex + 1],
-                updatedNodes[draggedNodeIndex],
-              ] = [
-                updatedNodes[draggedNodeIndex],
-                updatedNodes[draggedNodeIndex + 1],
-              ];
-            }
-          }
-        }
-
-        // Update positions of material nodes
         let yOffset = 0;
-        updatedNodes = updatedNodes
-          .map((n) => {
-            if (!n) return null; // Skip undefined nodes
-            const updatedNode = { ...n };
-            if (n.id === draggedNode.id) {
-              updatedNode.position = draggedNode.position;
-            } else {
-              updatedNode.position = { ...n.position, y: yOffset };
-            }
-            yOffset += parseInt(n.style.height) + nodeHeightOffset;
-            return updatedNode;
-          })
-          .filter(Boolean); // Remove any null entries
-
-        // Preserve non-material nodes
-        const nonMaterialNodes = prevNodes.filter(
-          (n) => n && n.type !== "custom"
-        );
-        return [...updatedNodes, ...nonMaterialNodes];
-      });
-    },
-    [nodeHeightOffset]
-  );
-
-  const handleNodeDragStop = useCallback(() => {
-    setNodes((nodes) => {
-      const materialNodes = nodes.filter((n) => n.type === "custom");
-      const otherNodes = nodes.filter((n) => n.type !== "custom");
-
-      let yOffset = 0;
-      const updatedMaterialNodes = materialNodes
-        .sort((a, b) => a.position.y - b.position.y)
-        .map((n) => {
-          const updatedNode = { ...n };
-          updatedNode.position = { x: 0, y: yOffset };
-          yOffset += parseInt(n.style.height) + nodeHeightOffset;
-          return updatedNode;
-        });
-
-      return [...updatedMaterialNodes, ...otherNodes];
-    });
-  }, [nodeHeightOffset]);
-
-  const removeEdge = useCallback(
-    (edgeId) => {
-      setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
-    },
-    [setEdges]
-  );
-
-  const isPropertyConnectedToPset = useCallback(
-    (propertyNodeId) => {
-      return edges.some(
-        (edge) =>
-          edge.source === propertyNodeId &&
-          nodes.find((n) => n.id === edge.target)?.type === "propertySet"
-      );
-    },
-    [edges, nodes]
-  );
-
-  const onConnect = useCallback(
-    (params) => {
-      const sourceNode = nodes.find((n) => n.id === params.source);
-      const targetNode = nodes.find((n) => n.id === params.target);
-
-      if (sourceNode && targetNode) {
-        if (
-          sourceNode.type === "property" &&
-          targetNode.type === "propertySet"
-        ) {
-          // Check if the property is already connected to a PropertySet
-          const isAlreadyConnected = edges.some(
-            (edge) =>
-              edge.source === params.source &&
-              nodes.find((n) => n.id === edge.target)?.type === "propertySet"
-          );
-
-          if (!isAlreadyConnected) {
-            setEdges((eds) =>
-              addEdge(
-                {
-                  ...params,
-                  type: "custom",
-                  animated: true,
-                  style: { stroke: "#888" },
-                  data: { removeEdge },
-                },
-                eds
-              )
-            );
-          } else {
-            console.log("Property is already connected to a PropertySet");
-            // Optionally, you can show a notification to the user here
-          }
-        } else if (
-          sourceNode.type === "custom" &&
-          targetNode.type === "property"
-        ) {
-          setEdges((eds) =>
-            addEdge(
-              {
-                ...params,
-                type: "custom",
-                animated: true,
-                style: { stroke: "#888" },
-                data: { removeEdge },
-              },
-              eds
-            )
-          );
-        }
-      }
-    },
-    [nodes, edges, setEdges, removeEdge]
-  );
-
-  const handleIFCUpload = () => {
-    // This is a placeholder function for IFC upload
-    console.log("IFC upload button clicked");
-    // You can add actual IFC upload logic here in the future
-  };
-
-  const addProperty = useCallback(
-    (name, type) => {
-      const newProperties = [...properties, { name, type }];
-      setProperties(newProperties);
-
-      // Calculate the position for the new property node
-      const bottomRightX = window.innerWidth - 370; // Adjusted to account for the wider Property Panel
-      const bottomRightY = window.innerHeight - 100; // Y position for the bottom of the screen, with some padding
-
-      // Add new property node at the bottom
-      const newPropertyNode = {
-        id: `property-${properties.length}`,
-        type: "property",
-        data: {
-          label: name,
-          selectedType: type,
-          onChange: handlePropertyTypeChange,
-          id: `property-${properties.length}`,
-        },
-        position: {
-          x: bottomRightX,
-          y: bottomRightY - propertyNodeHeight,
-        },
-        style: {
-          width: propertyNodeWidth,
-          height: propertyNodeHeight,
-          backgroundColor: getPropertyNodeColor(type),
-          border: "1px solid #ddd",
-          borderRadius: "15px",
-        },
-        draggable: false,
-      };
-
-      // Adjust positions of existing property nodes
-      setNodes((nodes) => {
-        const propertyNodes = nodes.filter((node) => node.type === "property");
-        const updatedNodes = nodes.map((node) => {
-          if (node.type === "property") {
-            return {
-              ...node,
-              position: {
-                x: node.position.x,
-                y: node.position.y - propertyNodeHeight - propertyNodeSpacing, // Increased spacing
-              },
-            };
-          }
-          return node;
-        });
-
-        // Add the new node at the bottom
-        return [...updatedNodes, newPropertyNode];
-      });
-
-      // Check if the new node is invisible, out of view, or hidden below the pane
-      setTimeout(() => {
-        const { x, y, zoom } = getViewport();
-        const viewportBottom = -y / zoom + window.innerHeight / zoom;
-        const viewportRight = -x / zoom + window.innerWidth / zoom;
-
-        const nodeBottom = newPropertyNode.position.y + propertyNodeHeight;
-        const nodeRight = newPropertyNode.position.x + propertyNodeWidth;
-
-        const isInvisible =
-          nodeBottom > viewportBottom || nodeRight > viewportRight;
-
-        if (isInvisible) {
-          const allNodes = getNodes();
-          const nodesBounds = allNodes.reduce(
-            (bounds, node) => {
-              bounds.minX = Math.min(bounds.minX, node.position.x);
-              bounds.minY = Math.min(bounds.minY, node.position.y);
-              bounds.maxX = Math.max(
-                bounds.maxX,
-                node.position.x + (node.width || propertyNodeWidth)
-              );
-              bounds.maxY = Math.max(
-                bounds.maxY,
-                node.position.y + (node.height || propertyNodeHeight)
-              );
-              return bounds;
-            },
-            { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
-          );
-
-          // Add padding for panes
-          nodesBounds.minX -= 250; // Account for sidebar width
-          nodesBounds.maxX += 350; // Account for property panel width
-
-          fitView({ padding: 0.2, bounds: nodesBounds });
-        }
-      }, 0);
-    },
-    [
-      properties,
-      setNodes,
-      getViewport,
-      getNodes,
-      fitView,
-      handlePropertyTypeChange,
-      propertyNodeHeight,
-      propertyNodeWidth,
-      propertyNodeSpacing,
-    ]
-  );
-
-  const updateProperty = (index, name, type) => {
-    const updatedProperties = [...properties];
-    updatedProperties[index] = { name, type };
-    setProperties(updatedProperties);
-
-    // Update property node on the canvas
-    setNodes((nodes) =>
-      nodes.map((node) => {
-        if (node.id === `property-${index}`) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              label: name,
-              selectedType: type,
-            },
-            style: {
-              ...node.style,
-              backgroundColor: getPropertyNodeColor(type),
-            },
+        const layersWithIds = data.map((layer) => {
+          const newLayer = {
+            ...layer,
+            id: `layer-${Date.now()}-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
+            yOffset: yOffset,
           };
-        }
-        return node;
-      })
-    );
-  };
-
-  const deleteProperty = (index) => {
-    const updatedProperties = properties.filter((_, i) => i !== index);
-    setProperties(updatedProperties);
-
-    setNodes((nodes) => {
-      const updatedNodes = nodes.filter(
-        (node) => node.id !== `property-${index}`
-      );
-
-      // Reposition remaining property nodes
-      const bottomRightY = window.innerHeight - 100;
-      return updatedNodes.map((node) => {
-        if (node.type === "property") {
-          const nodeIndex = updatedNodes
-            .filter((n) => n.type === "property")
-            .findIndex((n) => n.id === node.id);
-          return {
-            ...node,
-            position: {
-              x: node.position.x,
-              y:
-                bottomRightY -
-                (updatedNodes.filter((n) => n.type === "property").length -
-                  nodeIndex) *
-                  (propertyNodeHeight + propertyNodeSpacing),
-            },
-          };
-        }
-        return node;
+          yOffset += parseInt(layer.thickness) + nodeHeightOffset;
+          return newLayer;
+        });
+        updateAppState((prevState) => ({
+          ...prevState,
+          layers: layersWithIds,
+        }));
       });
-    });
-  };
+  }, [updateAppState, nodeHeightOffset]);
 
-  const propertyNodeRightEdge = 1550; // Assuming property nodes end at x=1550
-  const psetNodeWidth = 200;
-  const psetNodeHeight = 50;
-  const psetNodeSpacing = 40; // Increased from 20 to 40
-  const psetColumnSpacing = 40; // New constant for spacing between columns
+  // Generate nodes from appState
+  const nodes = useMemo(() => {
+    const layerNodes = appState.layers.map((layer) => ({
+      id: layer.id,
+      type: "custom",
+      data: { label: `${layer.material} (${layer.thickness}mm)` },
+      position: { x: 0, y: layer.yOffset },
+      style: {
+        width: 1000,
+        height: parseInt(layer.thickness),
+        backgroundColor: getMaterialColor(layer.material),
+        border: "1px solid #ddd",
+      },
+      draggable: true,
+    }));
 
-  const getPropertySetNodeColor = () => {
-    const colors = [
-      "#FF6B6B",
-      "#4ECDC4",
-      "#45B7D1",
-      "#FFA07A",
-      "#98D8C8",
-      "#F7DC6F",
-      "#BB8FCE",
-      "#82E0AA",
-      "#F1948A",
-      "#85C1E9",
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
+    const propertyNodes = appState.properties.map((prop, index) => ({
+      id: prop.id,
+      type: "property",
+      data: {
+        label: prop.name,
+        selectedType: prop.type,
+        onChange: handlePropertyTypeChange,
+        id: prop.id,
+        value: prop.value,
+      },
+      position: {
+        x: 1250,
+        y: index * (propertyNodeHeight + propertyNodeSpacing),
+      },
+      style: {
+        width: propertyNodeWidth,
+        height: propertyNodeHeight,
+        backgroundColor: prop.color || getPropertyNodeColor(prop.type), // Use existing color or generate new one
+        border: "1px solid #ddd",
+        borderRadius: "15px",
+      },
+      draggable: false,
+    }));
 
-  const handlePropertySetNameChange = useCallback(
-    (nodeId, newName) => {
-      setNodes((prevNodes) =>
-        prevNodes.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...node.data, name: newName } }
-            : node
-        )
-      );
-    },
-    [setNodes]
-  );
+    const propertySetNodes = appState.propertySets.map((pset) => ({
+      id: pset.id,
+      type: "propertySet",
+      data: {
+        id: pset.id,
+        name: pset.name,
+        onChange: handlePropertySetNameChange,
+        onDelete: deletePropertySet,
+        color: pset.color,
+      },
+      position: pset.position, // Use the stored position
+      draggable: true,
+    }));
 
-  const addPropertySet = useCallback(
-    (name) => {
-      const existingPsetNodes = nodes.filter((n) => n.type === "propertySet");
-      const psetCount = existingPsetNodes.length;
-
-      // Calculate position for the new node
-      const baseX = propertyNodeRightEdge + 200; // Increased gap from property nodes
-      const baseY = 50; // Starting Y position
-      const columnHeight = 5; // Number of nodes per column
-      const column = Math.floor(psetCount / columnHeight);
-      const row = psetCount % columnHeight;
-
-      const newPropertySetNode = {
-        id: `property-set-${Date.now()}`,
-        type: "propertySet",
-        data: {
-          name,
-          onChange: handlePropertySetNameChange,
-        },
-        position: {
-          x: baseX + column * (psetNodeWidth + psetColumnSpacing),
-          y: baseY + row * (psetNodeHeight + psetNodeSpacing),
-        },
-        style: {
-          width: psetNodeWidth,
-          height: psetNodeHeight,
-          backgroundColor: getPropertySetNodeColor(),
-          border: "none",
-          borderRadius: "10px",
-          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          fontWeight: "bold",
-          color: "#ffffff",
-        },
-        draggable: true,
-      };
-
-      setNodes((prevNodes) => [...prevNodes, newPropertySetNode]);
-
-      // Check if the new node is out of view
-      setTimeout(() => {
-        const { x, y, zoom } = getViewport();
-        const viewportRight = -x / zoom + window.innerWidth / zoom;
-        const viewportBottom = -y / zoom + window.innerHeight / zoom;
-
-        const nodeRight = newPropertySetNode.position.x + psetNodeWidth;
-        const nodeBottom = newPropertySetNode.position.y + psetNodeHeight;
-
-        if (nodeRight > viewportRight || nodeBottom > viewportBottom) {
-          fitView({
-            padding: 0.2,
-            includeHiddenNodes: false,
-            duration: 500,
-          });
-        }
-      }, 50);
-    },
-    [
-      nodes,
-      setNodes,
-      fitView,
-      getViewport,
-      propertyNodeRightEdge,
-      handlePropertySetNameChange,
-    ]
-  );
+    return [...layerNodes, ...propertyNodes, ...propertySetNodes];
+  }, [
+    appState.layers,
+    appState.properties,
+    appState.propertySets,
+    handlePropertyTypeChange,
+    handlePropertySetNameChange,
+    propertyNodeHeight,
+    propertyNodeSpacing,
+    propertyNodeWidth,
+    deletePropertySet,
+  ]);
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        edges={appState.edges}
+        onConnect={onConnect}
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
-        onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -1216,80 +1177,30 @@ const App = () => {
         edgesUpdatable={true}
         elementsSelectable={true}
         deleteKeyCode={["Backspace", "Delete"]}
-        onEdgeUpdate={(oldEdge, newConnection) => {
-          // Prevent updating edges that connect property to PropertySet
-          if (
-            nodes.find((n) => n.id === oldEdge.source)?.type === "property" &&
-            nodes.find((n) => n.id === oldEdge.target)?.type === "propertySet"
-          ) {
-            return;
-          }
-          setEdges((els) => updateEdge(oldEdge, newConnection, els));
-        }}
-        onEdgeUpdateStart={(_, edge) => {
-          // Optionally, you can add logic here to prevent dragging certain edges
-        }}
-        onEdgeUpdateEnd={(_, edge) => {
-          // Optionally, you can add logic here after an edge update ends
+        onNodesChange={(changes) => {
+          // Handle node position changes here if needed
         }}
       >
         <Background />
         <Controls />
 
-        {/* Updated Sidebar Panel (Assembly Manager) */}
-        <Panel
-          position="top-left"
-          className={`sidebar-panel ${
-            isSidebarCollapsed && !isSidebarFixed ? "collapsed" : ""
-          }`}
-          onMouseEnter={handleSidebarMouseEnter}
-          onMouseLeave={handleSidebarMouseLeave}
-          style={{
-            transition: "all 0.3s ease-in-out",
-            height: isSidebarCollapsed && !isSidebarFixed ? "40px" : "auto",
-            width: isSidebarCollapsed && !isSidebarFixed ? "auto" : "300px",
-            maxWidth: "300px",
-            overflow: "hidden",
-          }}
-        >
-          <div className="panel-header">
-            <h2>Assembly Manager: </h2>
-            <label className="fix-checkbox">
-              <input
-                type="checkbox"
-                checked={isSidebarFixed}
-                onChange={() => setIsSidebarFixed(!isSidebarFixed)}
-              />
-              <FaThumbtack size={16} />
-            </label>
-          </div>
-          <div className="sidebar-content">
-            <p>
-              Extract all individual layers of construction elements, adjust
-              them and add properties...
-            </p>
-            <button className="upload-button" onClick={handleIFCUpload}>
-              <FaUpload size={16} style={{ marginRight: "8px" }} />
-              Upload
-            </button>
-          </div>
-          <div className="propertyset-tab">
-            <FaUpload size={20} />
-            <span>Upload IFC</span>
-          </div>
-        </Panel>
+        {/* Upload Panel */}
+        <UploadPanel
+          isFixed={isUploadPanelFixed}
+          setIsFixed={setIsUploadPanelFixed}
+        />
 
         {/* Property Panel */}
         <PropertyPanel
-          properties={properties}
+          properties={appState.properties}
           addProperty={addProperty}
-          updateProperty={updateProperty}
+          updateProperty={handlePropertyTypeChange}
           deleteProperty={deleteProperty}
           isFixed={isPropertyPanelFixed}
           setIsFixed={setIsPropertyPanelFixed}
         />
 
-        {/* New PropertySet Panel */}
+        {/* PropertySet Panel */}
         <PropertySetPanel
           addPropertySet={addPropertySet}
           isFixed={isPropertySetPanelFixed}
@@ -1308,89 +1219,3 @@ const AppWrapper = () => (
 );
 
 export default AppWrapper;
-
-// Add or update these styles in your CSS
-const styles = `
-  .sidebar-panel {
-    background-color: #f0f4f8;
-    border-radius: 5px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-    z-index: 5;
-  }
-
-  .property-panel {
-    background-color: #f0f8f4;
-  }
-
-  .propertyset-panel {
-    background-color: #f8f4f0;
-  }
-
-  .sidebar-panel.collapsed {
-    width: auto !important;
-    overflow: visible !important;
-  }
-
-  .sidebar-panel.collapsed .panel-header,
-  .sidebar-panel.collapsed .sidebar-content {
-    display: none;
-  }
-
-  .sidebar-tab {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    cursor: pointer;
-    white-space: nowrap;
-    background-color: #e0e8f0;
-    border-radius: 5px;
-  }
-
-  .sidebar-tab span {
-    margin-left: 10px;
-    font-weight: bold;
-  }
-
-  .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    white-space: nowrap;
-    background-color: #d0d8e0;
-    border-radius: 5px 5px 0 0;
-  }
-
-  .sidebar-content {
-    padding: 10px;
-  }
-
-  .upload-button {
-    margin-top: 10px;
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-
-  .upload-button:hover {
-    background-color: #357abd;
-  }
-
-  /* Ensure horizontal orientation in collapsed state */
-  .sidebar-panel.collapsed .sidebar-tab {
-    flex-direction: row;
-    justify-content: flex-start;
-    width: auto;
-  }
-
-  /* ... (rest of your existing styles) */
-`;
-
-// Add this style tag to your component or include it in your CSS file
-const styleTag = document.createElement("style");
-styleTag.textContent = styles;
-document.head.appendChild(styleTag);
