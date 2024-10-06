@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useRef,
   useMemo,
+  forwardRef,
 } from "react";
 import ReactFlow, {
   Background,
@@ -24,7 +25,26 @@ import {
   FaTimes as RemoveIcon,
   FaLayerGroup,
   FaUpload,
+  FaSpinner,
 } from "react-icons/fa";
+
+const pyodideWorker = new Worker(
+  new URL("./pyodideWorker.js", import.meta.url)
+);
+
+async function loadIFC(arrayBuffer) {
+  return new Promise((resolve, reject) => {
+    pyodideWorker.onmessage = (event) => {
+      if (event.data.error) {
+        reject(new Error(event.data.error));
+      } else {
+        resolve(event.data.result);
+      }
+    };
+
+    pyodideWorker.postMessage({ arrayBuffer });
+  });
+}
 
 const CustomNode = ({ data }) => {
   return (
@@ -450,257 +470,416 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
-const PropertyPanel = ({
-  properties,
-  addProperty,
-  updateProperty,
-  deleteProperty,
-  isFixed,
-  setIsFixed,
-}) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const [newPropertyName, setNewPropertyName] = useState("");
-  const [newPropertyType, setNewPropertyType] = useState("IfcText");
-  const panelRef = useRef(null);
+const PropertyPanel = forwardRef(
+  (
+    {
+      properties,
+      addProperty,
+      updateProperty,
+      deleteProperty,
+      isFixed,
+      setIsFixed,
+    },
+    ref
+  ) => {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+    const [isCollapsing, setIsCollapsing] = useState(false);
+    const [newPropertyName, setNewPropertyName] = useState("");
+    const [newPropertyType, setNewPropertyType] = useState("IfcText");
+    const [editingPropertyId, setEditingPropertyId] = useState(null);
+    const panelRef = useRef(null);
+    const timeoutRef = useRef(null);
+    const inputRef = useRef(null);
 
-  useEffect(() => {
-    if (!isCollapsed && panelRef.current) {
-      const contentHeight = panelRef.current.scrollHeight;
-      panelRef.current.style.height = `${contentHeight}px`;
-    }
-  }, [isCollapsed, properties]);
+    const handleMouseEnter = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      setIsCollapsed(false);
+      setIsCollapsing(false);
+    };
 
-  const handleMouseEnter = () => {
-    setIsCollapsed(false);
-  };
+    const handleMouseLeave = () => {
+      if (!isFixed) {
+        setIsCollapsing(true);
+        timeoutRef.current = setTimeout(() => {
+          setIsCollapsed(true);
+          setIsCollapsing(false);
+        }, 3000);
+      }
+    };
 
-  const handleMouseLeave = () => {
-    if (!isFixed) {
-      setTimeout(() => setIsCollapsed(true), 400);
-    }
-  };
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, []);
 
-  return (
-    <Panel
-      position="right"
-      className={`property-panel ${isCollapsed && !isFixed ? "collapsed" : ""}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      ref={panelRef}
-    >
-      <div className="panel-header">
-        <h3>Property Launcher:</h3>
-        <label className="fix-checkbox">
-          <input
-            type="checkbox"
-            checked={isFixed}
-            onChange={() => setIsFixed(!isFixed)}
-          />
-          <FaThumbtack size={16} />
-        </label>
-      </div>
-      <div className="property-content">
-        <p>Add, edit, or remove properties from your IFC layers.</p>
-        {properties.map((prop, index) => (
-          <div key={index} className="property-item">
+    useEffect(() => {
+      if (!isCollapsed && panelRef.current) {
+        const contentHeight = panelRef.current.scrollHeight;
+        panelRef.current.style.height = `${contentHeight}px`;
+      }
+    }, [isCollapsed, properties]);
+
+    useEffect(() => {
+      if (editingPropertyId && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, [editingPropertyId]);
+
+    const handlePropertyNameClick = (propertyId) => {
+      setEditingPropertyId(propertyId);
+    };
+
+    const handlePropertyNameChange = (e, propertyId) => {
+      const newName = e.target.value;
+      updateProperty(
+        propertyId,
+        newName,
+        properties.find((p) => p.id === propertyId).type
+      );
+    };
+
+    const handlePropertyNameBlur = () => {
+      setEditingPropertyId(null);
+    };
+
+    const handlePropertyNameKeyDown = (e) => {
+      if (e.key === "Enter") {
+        setEditingPropertyId(null);
+      }
+    };
+
+    return (
+      <Panel
+        position="right"
+        className={`property-panel ${isCollapsed ? "collapsed" : ""} ${
+          isCollapsing ? "collapsing" : ""
+        }`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        ref={panelRef}
+      >
+        <div className="panel-header">
+          <h3>Property Launcher:</h3>
+          <label className="fix-checkbox">
             <input
-              type="text"
-              value={prop.name}
-              onChange={(e) =>
-                updateProperty(`property-${index}`, e.target.value, prop.type)
-              }
-              placeholder="Property name"
+              type="checkbox"
+              checked={isFixed}
+              onChange={() => setIsFixed(!isFixed)}
             />
-            <select
-              value={prop.type}
-              onChange={(e) => updateProperty(index, prop.name, e.target.value)}
-              title="Select property type"
-            >
-              <option value="IfcText">IfcText</option>
-              <option value="IfcBoolean">IfcBoolean</option>
-              <option value="IfcInteger">IfcInteger</option>
-              <option value="IfcReal">IfcReal</option>
-              <option value="IfcLabel">IfcLabel</option>
-              <option value="IfcIdentifier">IfcIdentifier</option>
-              <option value="IfcClassification">IfcClassification</option>
-            </select>
-            <button
-              onClick={() => deleteProperty(index)}
-              title="Delete property"
-            >
-              X
-            </button>
-          </div>
-        ))}
-        <div className="add-property">
-          <input
-            type="text"
-            value={newPropertyName}
-            onChange={(e) => setNewPropertyName(e.target.value)}
-            placeholder="New property name"
-          />
-          <select
-            value={newPropertyType}
-            onChange={(e) => setNewPropertyType(e.target.value)}
-            title="Select new property type"
-          >
-            <option value="IfcText">IfcText</option>
-            <option value="IfcBoolean">IfcBoolean</option>
-            <option value="IfcInteger">IfcInteger</option>
-            <option value="IfcReal">IfcReal</option>
-            <option value="IfcLabel">IfcLabel</option>
-            <option value="IfcIdentifier">IfcIdentifier</option>
-          </select>
-          <button
-            className="add-button"
-            onClick={() => {
-              if (newPropertyName) {
-                addProperty(newPropertyName, newPropertyType);
-                setNewPropertyName("");
-                setNewPropertyType("IfcText");
-              }
-            }}
-            title="Add new property"
-          >
-            Add Property
-          </button>
+            <FaThumbtack size={16} />
+          </label>
         </div>
-      </div>
-      <div className="property-tab">
-        <FaList size={20} />
-        <span>Properties</span>
-      </div>
-    </Panel>
-  );
-};
-
-// Add this new component for PropertySet Panel
-const PropertySetPanel = ({ addPropertySet, isFixed, setIsFixed }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const [newPropertySetName, setNewPropertySetName] = useState("");
-  const panelRef = useRef(null);
-
-  const handleMouseEnter = () => {
-    setIsCollapsed(false);
-  };
-
-  const handleMouseLeave = () => {
-    if (!isFixed) {
-      setTimeout(() => setIsCollapsed(true), 400);
-    }
-  };
-
-  return (
-    <Panel
-      position="top-right"
-      className={`propertyset-panel ${
-        isCollapsed && !isFixed ? "collapsed" : ""
-      }`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      ref={panelRef}
-      style={{ right: "400px" }} // Moved more to the left
-    >
-      {!isCollapsed && (
-        <>
-          <div className="panel-header">
-            <h3>PSet Launcher:</h3>
-            <label className="fix-checkbox">
-              <input
-                type="checkbox"
-                checked={isFixed}
-                onChange={() => setIsFixed(!isFixed)}
-              />
-              <FaThumbtack size={16} />
-            </label>
-          </div>
-          <div className="propertyset-content">
-            <p>Add new PropertySets to structure properties in your IFC.</p>
-            <div className="add-propertyset">
+        {!isCollapsed && (
+          <div className="property-content">
+            <p>Add, edit, or remove properties from your IFC layers.</p>
+            {properties.map((prop) => (
+              <div key={prop.id} className="property-item">
+                {editingPropertyId === prop.id ? (
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={prop.name}
+                    onChange={(e) => handlePropertyNameChange(e, prop.id)}
+                    onBlur={handlePropertyNameBlur}
+                    onKeyDown={handlePropertyNameKeyDown}
+                  />
+                ) : (
+                  <div onClick={() => handlePropertyNameClick(prop.id)}>
+                    {prop.name}
+                  </div>
+                )}
+                <select
+                  value={prop.type}
+                  onChange={(e) =>
+                    updateProperty(prop.id, prop.name, e.target.value)
+                  }
+                  title="Select property type"
+                >
+                  <option value="IfcText">IfcText</option>
+                  <option value="IfcBoolean">IfcBoolean</option>
+                  <option value="IfcInteger">IfcInteger</option>
+                  <option value="IfcReal">IfcReal</option>
+                  <option value="IfcLabel">IfcLabel</option>
+                  <option value="IfcIdentifier">IfcIdentifier</option>
+                  <option value="IfcClassification">IfcClassification</option>
+                </select>
+                <button
+                  onClick={() => deleteProperty(prop.id)}
+                  title="Delete property"
+                >
+                  X
+                </button>
+              </div>
+            ))}
+            <div className="add-property">
               <input
                 type="text"
-                value={newPropertySetName}
-                onChange={(e) => setNewPropertySetName(e.target.value)}
-                placeholder="New PropertySet name"
+                value={newPropertyName}
+                onChange={(e) => setNewPropertyName(e.target.value)}
+                placeholder="New property name"
               />
+              <select
+                value={newPropertyType}
+                onChange={(e) => setNewPropertyType(e.target.value)}
+                title="Select new property type"
+              >
+                <option value="IfcText">IfcText</option>
+                <option value="IfcBoolean">IfcBoolean</option>
+                <option value="IfcInteger">IfcInteger</option>
+                <option value="IfcReal">IfcReal</option>
+                <option value="IfcLabel">IfcLabel</option>
+                <option value="IfcIdentifier">IfcIdentifier</option>
+                <option value="IfcClassification">IfcClassification</option>
+              </select>
               <button
+                className="add-button"
                 onClick={() => {
-                  if (newPropertySetName) {
-                    addPropertySet(newPropertySetName);
-                    setNewPropertySetName("");
+                  if (newPropertyName) {
+                    addProperty(newPropertyName, newPropertyType);
+                    setNewPropertyName("");
+                    setNewPropertyType("IfcText");
                   }
                 }}
+                title="Add new property"
               >
-                Add PropertySet
+                Add Property
               </button>
             </div>
           </div>
-        </>
-      )}
-      <div className="propertyset-tab">
-        <FaLayerGroup size={20} />
-        <span>PropertySets</span>
-      </div>
-    </Panel>
-  );
-};
+        )}
+        {isCollapsed && (
+          <div className="property-tab">
+            <FaList size={20} />
+            <span>Properties</span>
+          </div>
+        )}
+      </Panel>
+    );
+  }
+);
+
+// Add this new component for PropertySet Panel
+const PropertySetPanel = forwardRef(
+  ({ addPropertySet, isFixed, setIsFixed }, ref) => {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+    const [isCollapsing, setIsCollapsing] = useState(false);
+    const [newPropertySetName, setNewPropertySetName] = useState("");
+    const panelRef = useRef(null);
+    const timeoutRef = useRef(null);
+
+    const handleMouseEnter = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      setIsCollapsed(false);
+      setIsCollapsing(false);
+    };
+
+    const handleMouseLeave = () => {
+      if (!isFixed) {
+        setIsCollapsing(true);
+        timeoutRef.current = setTimeout(() => {
+          setIsCollapsed(true);
+          setIsCollapsing(false);
+        }, 3000);
+      }
+    };
+
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, []);
+
+    return (
+      <Panel
+        position="top-right"
+        className={`propertyset-panel ${isCollapsed ? "collapsed" : ""} ${
+          isCollapsing ? "collapsing" : ""
+        }`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        ref={panelRef}
+        style={{ right: "370px" }}
+      >
+        {!isCollapsed && (
+          <>
+            <div className="panel-header">
+              <h3>PSet Launcher:</h3>
+              <label className="fix-checkbox">
+                <input
+                  type="checkbox"
+                  checked={isFixed}
+                  onChange={() => setIsFixed(!isFixed)}
+                />
+                <FaThumbtack size={16} />
+              </label>
+            </div>
+            <div className="propertyset-content">
+              <p>Add new PropertySets to structure properties.</p>
+              <div className="add-propertyset">
+                <input
+                  type="text"
+                  value={newPropertySetName}
+                  onChange={(e) => setNewPropertySetName(e.target.value)}
+                  placeholder="New PropertySet name"
+                />
+                <button
+                  onClick={() => {
+                    if (newPropertySetName) {
+                      addPropertySet(newPropertySetName);
+                      setNewPropertySetName("");
+                    }
+                  }}
+                >
+                  Add PropertySet
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+        {isCollapsed && (
+          <div className="propertyset-tab">
+            <FaLayerGroup size={20} />
+            <span>PropertySets</span>
+          </div>
+        )}
+      </Panel>
+    );
+  }
+);
 
 // Add this new component before the App component
-const UploadPanel = ({ isFixed, setIsFixed }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const panelRef = useRef(null);
+const UploadPanel = forwardRef(
+  (
+    {
+      isFixed,
+      setIsFixed,
+      onFileUpload,
+      ifcElements,
+      selectedElement,
+      onElementSelect,
+    },
+    ref
+  ) => {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+    const [isCollapsing, setIsCollapsing] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const panelRef = useRef(null);
+    const timeoutRef = useRef(null);
 
-  const handleMouseEnter = () => {
-    setIsCollapsed(false);
-  };
+    const handleMouseEnter = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      setIsCollapsed(false);
+      setIsCollapsing(false);
+    };
 
-  const handleMouseLeave = () => {
-    if (!isFixed) {
-      setTimeout(() => setIsCollapsed(true), 400);
-    }
-  };
+    const handleMouseLeave = () => {
+      if (!isFixed) {
+        setIsCollapsing(true);
+        timeoutRef.current = setTimeout(() => {
+          setIsCollapsed(true);
+          setIsCollapsing(false);
+        }, 3000);
+      }
+    };
 
-  const handleUpload = () => {
-    // Implement your upload logic here
-    console.log("Upload button clicked");
-  };
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, []);
 
-  return (
-    <Panel
-      position="top-left"
-      className={`upload-panel ${isCollapsed && !isFixed ? "collapsed" : ""}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      ref={panelRef}
-    >
-      {!isCollapsed && (
-        <>
-          <div className="panel-header">
-            <h3>Upload IFC:</h3>
-            <label className="fix-checkbox">
-              <input
-                type="checkbox"
-                checked={isFixed}
-                onChange={() => setIsFixed(!isFixed)}
-              />
-              <FaThumbtack size={16} />
-            </label>
+    const handleFileChange = async (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        setIsFixed(true); // Auto-pin the panel when upload starts
+        setIsLoading(true); // Set loading state to true
+        await onFileUpload(file);
+        setIsLoading(false); // Set loading state to false when upload is complete
+      }
+    };
+
+    const handleElementSelect = (e) => {
+      const selectedId = parseInt(e.target.value);
+      const element = ifcElements.find((el) => el.id === selectedId);
+      onElementSelect(element);
+      setIsFixed(false); // Unpin the panel after element is selected
+    };
+
+    return (
+      <Panel
+        position="top-left"
+        className={`upload-panel ${isCollapsed ? "collapsed" : ""} ${
+          isCollapsing ? "collapsing" : ""
+        }`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        ref={panelRef}
+      >
+        {!isCollapsed && (
+          <div className="panel-content">
+            <div className="panel-header">
+              <h3>IFC Uploader</h3>
+              <label className="fix-checkbox">
+                <input
+                  type="checkbox"
+                  checked={isFixed}
+                  onChange={() => setIsFixed(!isFixed)}
+                />
+                <FaThumbtack size={16} />
+              </label>
+            </div>
+            <div className="upload-content">
+              <p>
+                Upload an IFC file and select elements with multiple layers.
+              </p>
+              <input type="file" onChange={handleFileChange} accept=".ifc" />
+              {isLoading && (
+                <div className="loading-indicator">
+                  <FaSpinner className="spinner" />
+                  <span>Loading IFC file...</span>
+                </div>
+              )}
+              {ifcElements.length > 0 ? (
+                <select
+                  value={selectedElement ? selectedElement.id : ""}
+                  onChange={handleElementSelect}
+                >
+                  <option value="">Select element with multiple layers</option>
+                  {ifcElements.map((element) => (
+                    <option key={element.id} value={element.id}>
+                      {element.name} ({element.type})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p>No elements with multiple layers found</p>
+              )}
+            </div>
           </div>
-          <div className="upload-content">
-            <button className="upload-button" onClick={handleUpload}>
-              <FaUpload size={16} style={{ marginRight: "8px" }} />
-              Upload IFC File
-            </button>
+        )}
+        {isCollapsed && (
+          <div className="panel-tab">
+            <FaUpload size={20} />
+            <span>Upload</span>
           </div>
-        </>
-      )}
-      <div className="upload-tab">
-        <FaUpload size={20} />
-        <span>Upload</span>
-      </div>
-    </Panel>
-  );
-};
+        )}
+      </Panel>
+    );
+  }
+);
 
 const App = () => {
   const [appState, setAppState] = useState({
@@ -709,11 +888,16 @@ const App = () => {
     propertySets: [],
     edges: [],
   });
-  const [isPropertyPanelFixed, setIsPropertyPanelFixed] = useState(false);
-  const [isPropertySetPanelFixed, setIsPropertySetPanelFixed] = useState(false);
-  const [isUploadPanelFixed, setIsUploadPanelFixed] = useState(false);
+  const [isPanelFixed, setIsPanelFixed] = useState({
+    upload: false,
+    property: false,
+    propertySet: false,
+  });
 
-  const { fitView } = useReactFlow();
+  const [ifcElements, setIfcElements] = useState([]);
+  const [selectedElement, setSelectedElement] = useState(null);
+
+  const { fitView, getNodes, getViewport } = useReactFlow();
 
   const nodeHeightOffset = 5;
   const propertyNodeHeight = 100;
@@ -751,15 +935,27 @@ const App = () => {
           properties: [...prevState.properties, newProperty],
         };
 
-        // Use setTimeout to ensure the node is added before we try to fit the view
+        // Check if the new node is in view before fitting
         setTimeout(() => {
-          fitView({ padding: 0.2, includeHiddenNodes: false });
+          const nodes = getNodes();
+          const viewport = getViewport();
+          const newNode = nodes.find((node) => node.id === newPropertyId);
+          if (newNode) {
+            const isInView =
+              newNode.position.x >= viewport.x &&
+              newNode.position.x <= viewport.x + viewport.width &&
+              newNode.position.y >= viewport.y &&
+              newNode.position.y <= viewport.y + viewport.height;
+            if (!isInView) {
+              fitView({ padding: 0.2, includeHiddenNodes: false });
+            }
+          }
         }, 50);
 
         return newState;
       });
     },
-    [updateAppState, fitView]
+    [updateAppState, fitView, getNodes, getViewport]
   );
 
   const deleteProperty = useCallback(
@@ -818,15 +1014,27 @@ const App = () => {
           ],
         };
 
-        // Use setTimeout to ensure the node is added before we try to fit the view
+        // Check if the new node is in view before fitting
         setTimeout(() => {
-          fitView({ padding: 0.2, includeHiddenNodes: false });
+          const nodes = getNodes();
+          const viewport = getViewport();
+          const newNode = nodes.find((node) => node.id === newPropertySetId);
+          if (newNode) {
+            const isInView =
+              newNode.position.x >= viewport.x &&
+              newNode.position.x <= viewport.x + viewport.width &&
+              newNode.position.y >= viewport.y &&
+              newNode.position.y <= viewport.y + viewport.height;
+            if (!isInView) {
+              fitView({ padding: 0.2, includeHiddenNodes: false });
+            }
+          }
         }, 50);
 
         return newState;
       });
     },
-    [updateAppState, fitView]
+    [updateAppState, fitView, getNodes, getViewport]
   );
 
   const removeEdge = useCallback(
@@ -1071,6 +1279,158 @@ const App = () => {
     }
   };
 
+  const handleFileUpload = useCallback(async (file) => {
+    console.log("File upload started:", file);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      console.log("File converted to ArrayBuffer");
+      const ifcData = await loadIFC(arrayBuffer);
+      console.log("IFC data loaded:", ifcData);
+
+      // Filter elements with multiple layers
+      const elementsWithMultiLayers = ifcData.filter(
+        (element) => element.layers && element.layers.length > 1
+      );
+      console.log("Elements with multiple layers:", elementsWithMultiLayers);
+      setIfcElements(elementsWithMultiLayers);
+
+      if (elementsWithMultiLayers.length === 0) {
+        console.log("No elements with multiple layers found");
+      }
+    } catch (error) {
+      console.error("Error processing IFC file:", error);
+      // You might want to show an error message to the user here
+    }
+  }, []);
+
+  const handleElementSelect = useCallback(
+    (element) => {
+      setSelectedElement(element);
+      // Clear existing layers when a new element is selected
+      updateAppState((prevState) => ({
+        ...prevState,
+        layers: [],
+        properties: [],
+        propertySets: [],
+        edges: [],
+      }));
+    },
+    [updateAppState]
+  );
+
+  const handlePanelFixChange = (panelName, isFixed) => {
+    setIsPanelFixed((prev) => ({ ...prev, [panelName]: isFixed }));
+  };
+
+  // Update the nodes generation to include the selected IFC element layers
+  const nodes = useMemo(() => {
+    let currentYOffset = 0;
+    const layerNodes = [];
+
+    if (selectedElement) {
+      selectedElement.layers.forEach((layer, index) => {
+        const heightInPixels = layer.thickness * 1000; // Convert meters to millimeters
+        const backgroundColor =
+          layer.material && layer.material.color
+            ? `rgb(${layer.material.color.red * 255}, ${
+                layer.material.color.green * 255
+              }, ${layer.material.color.blue * 255})`
+            : getMaterialColor(
+                layer.material ? layer.material.name : "Unknown"
+              );
+
+        layerNodes.push({
+          id: `ifc-layer-${selectedElement.id}-${index}`,
+          type: "custom",
+          data: {
+            label: `${layer.material ? layer.material.name : "Unknown"} (${
+              layer.thickness * 1000
+            }mm)`,
+          },
+          position: { x: 0, y: currentYOffset },
+          style: {
+            width: 1000,
+            height: heightInPixels,
+            backgroundColor: backgroundColor,
+            border: "1px solid #ddd",
+          },
+          draggable: false,
+        });
+        currentYOffset += heightInPixels + nodeHeightOffset;
+      });
+    } else {
+      appState.layers.forEach((layer) => {
+        const heightInPixels = parseInt(layer.thickness);
+        layerNodes.push({
+          id: layer.id,
+          type: "custom",
+          data: { label: `${layer.material} (${layer.thickness}mm)` },
+          position: { x: 0, y: currentYOffset },
+          style: {
+            width: 1000,
+            height: heightInPixels,
+            backgroundColor: getMaterialColor(layer.material),
+            border: "1px solid #ddd",
+          },
+          draggable: true,
+        });
+        currentYOffset += heightInPixels + nodeHeightOffset;
+      });
+    }
+
+    const propertyNodes = appState.properties.map((prop, index) => ({
+      id: prop.id,
+      type: "property",
+      data: {
+        label: prop.name,
+        selectedType: prop.type,
+        onChange: handlePropertyTypeChange,
+        id: prop.id,
+        value: prop.value,
+      },
+      position: {
+        x: 1250,
+        y: index * (propertyNodeHeight + propertyNodeSpacing),
+      },
+      style: {
+        width: propertyNodeWidth,
+        height: propertyNodeHeight,
+        backgroundColor: prop.color || getPropertyNodeColor(prop.type),
+        border: "1px solid #ddd",
+        borderRadius: "15px",
+      },
+      draggable: false,
+    }));
+
+    const propertySetNodes = appState.propertySets.map((pset) => ({
+      id: pset.id,
+      type: "propertySet",
+      data: {
+        id: pset.id,
+        name: pset.name,
+        onChange: handlePropertySetNameChange,
+        onDelete: deletePropertySet,
+        color: pset.color,
+      },
+      position: pset.position,
+      draggable: true,
+    }));
+
+    return [...layerNodes, ...propertyNodes, ...propertySetNodes];
+  }, [
+    selectedElement,
+    appState.layers,
+    appState.properties,
+    appState.propertySets,
+    handlePropertyTypeChange,
+    handlePropertySetNameChange,
+    propertyNodeHeight,
+    propertyNodeSpacing,
+    propertyNodeWidth,
+    deletePropertySet,
+    nodeHeightOffset,
+  ]);
+
   // Load initial data
   useEffect(() => {
     fetch("/layers.json")
@@ -1095,73 +1455,6 @@ const App = () => {
       });
   }, [updateAppState, nodeHeightOffset]);
 
-  // Generate nodes from appState
-  const nodes = useMemo(() => {
-    const layerNodes = appState.layers.map((layer) => ({
-      id: layer.id,
-      type: "custom",
-      data: { label: `${layer.material} (${layer.thickness}mm)` },
-      position: { x: 0, y: layer.yOffset },
-      style: {
-        width: 1000,
-        height: parseInt(layer.thickness),
-        backgroundColor: getMaterialColor(layer.material),
-        border: "1px solid #ddd",
-      },
-      draggable: true,
-    }));
-
-    const propertyNodes = appState.properties.map((prop, index) => ({
-      id: prop.id,
-      type: "property",
-      data: {
-        label: prop.name,
-        selectedType: prop.type,
-        onChange: handlePropertyTypeChange,
-        id: prop.id,
-        value: prop.value,
-      },
-      position: {
-        x: 1250,
-        y: index * (propertyNodeHeight + propertyNodeSpacing),
-      },
-      style: {
-        width: propertyNodeWidth,
-        height: propertyNodeHeight,
-        backgroundColor: prop.color || getPropertyNodeColor(prop.type), // Use existing color or generate new one
-        border: "1px solid #ddd",
-        borderRadius: "15px",
-      },
-      draggable: false,
-    }));
-
-    const propertySetNodes = appState.propertySets.map((pset) => ({
-      id: pset.id,
-      type: "propertySet",
-      data: {
-        id: pset.id,
-        name: pset.name,
-        onChange: handlePropertySetNameChange,
-        onDelete: deletePropertySet,
-        color: pset.color,
-      },
-      position: pset.position, // Use the stored position
-      draggable: true,
-    }));
-
-    return [...layerNodes, ...propertyNodes, ...propertySetNodes];
-  }, [
-    appState.layers,
-    appState.properties,
-    appState.propertySets,
-    handlePropertyTypeChange,
-    handlePropertySetNameChange,
-    propertyNodeHeight,
-    propertyNodeSpacing,
-    propertyNodeWidth,
-    deletePropertySet,
-  ]);
-
   return (
     <div style={{ height: "100vh", width: "100%" }}>
       <ReactFlow
@@ -1173,21 +1466,23 @@ const App = () => {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
+        // Remove the onNodesChange prop to prevent fitting on all node changes
         nodesConnectable={true}
         edgesUpdatable={true}
         elementsSelectable={true}
         deleteKeyCode={["Backspace", "Delete"]}
-        onNodesChange={(changes) => {
-          // Handle node position changes here if needed
-        }}
       >
         <Background />
         <Controls />
 
         {/* Upload Panel */}
         <UploadPanel
-          isFixed={isUploadPanelFixed}
-          setIsFixed={setIsUploadPanelFixed}
+          isFixed={isPanelFixed.upload}
+          setIsFixed={(isFixed) => handlePanelFixChange("upload", isFixed)}
+          onFileUpload={handleFileUpload}
+          ifcElements={ifcElements}
+          selectedElement={selectedElement}
+          onElementSelect={handleElementSelect}
         />
 
         {/* Property Panel */}
@@ -1196,15 +1491,15 @@ const App = () => {
           addProperty={addProperty}
           updateProperty={handlePropertyTypeChange}
           deleteProperty={deleteProperty}
-          isFixed={isPropertyPanelFixed}
-          setIsFixed={setIsPropertyPanelFixed}
+          isFixed={isPanelFixed.property}
+          setIsFixed={(isFixed) => handlePanelFixChange("property", isFixed)}
         />
 
         {/* PropertySet Panel */}
         <PropertySetPanel
           addPropertySet={addPropertySet}
-          isFixed={isPropertySetPanelFixed}
-          setIsFixed={setIsPropertySetPanelFixed}
+          isFixed={isPanelFixed.propertySet}
+          setIsFixed={(isFixed) => handlePanelFixChange("propertySet", isFixed)}
         />
       </ReactFlow>
     </div>
