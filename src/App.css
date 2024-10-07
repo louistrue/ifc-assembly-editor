@@ -630,21 +630,46 @@ input:checked + .slider:before {
 /* ... (rest of the styles remain unchanged) */
 
 .edgebutton-foreignobject {
-  width: 20px;
-  height: 20px;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+}
+
+.edgebutton-wrapper {
+  width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   background: transparent;
-  cursor: pointer;
 }
 
-.edgebutton-foreignobject svg {
+.edgebutton {
+  width: 24px;
+  height: 24px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.edgebutton:hover {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+
+.edgebutton svg {
   color: #ff0000;
+  font-size: 14px;
   transition: color 0.3s ease;
 }
 
-.edgebutton-foreignobject:hover svg {
+.edgebutton:hover svg {
   color: #cc0000;
 }
 
@@ -1691,4 +1716,37 @@ input:checked + .slider:before {
 
 .property-item > input[type="text"]:focus {
   border-color: #4a90e2;
+}
+
+.edgebutton {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+
+.edgebutton svg {
+  color: #ff0000;
+  font-size: 16px;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.edgebutton:hover svg {
+  color: #cc0000;
+  transform: scale(1.2);
+}
+
+.edgebutton-foreignobject div {
+  background: transparent;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40px;
 }

@@ -16,6 +16,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
   getBezierPath,
+  MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import "./App.css";
@@ -27,437 +28,15 @@ import {
   FaUpload,
   FaSpinner,
 } from "react-icons/fa";
-
-const pyodideWorker = new Worker(
-  new URL("./pyodideWorker.js", import.meta.url)
-);
-
-async function loadIFC(arrayBuffer) {
-  return new Promise((resolve, reject) => {
-    pyodideWorker.onmessage = (event) => {
-      if (event.data.error) {
-        reject(new Error(event.data.error));
-      } else {
-        resolve(event.data.result);
-      }
-    };
-
-    pyodideWorker.postMessage({ arrayBuffer });
-  });
-}
-
-const CustomNode = ({ data }) => {
-  return (
-    <div
-      className="drag-handle"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100%",
-      }}
-    >
-      {data.label}
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ width: "12px", height: "12px" }}
-      />
-    </div>
-  );
-};
-
-const PropertyNode = ({ data }) => {
-  const [localLabel, setLocalLabel] = useState(data.label);
-  const [localValue, setLocalValue] = useState(data.value || "");
-  const [isEditing, setIsEditing] = useState(false);
-  const [previousValues, setPreviousValues] = useState({});
-
-  // Use useEffect to update local state when props change
-  useEffect(() => {
-    setLocalLabel(data.label);
-    setLocalValue(data.value || "");
-  }, [data.label, data.value]);
-
-  const handleNameChange = (event) => {
-    setLocalLabel(event.target.value);
-  };
-
-  const handleValueChange = (event) => {
-    let newValue = event.target.value;
-    if (data.selectedType === "IfcBoolean") {
-      newValue = event.target.checked;
-    } else if (data.selectedType === "IfcInteger") {
-      newValue = parseInt(newValue, 10);
-    } else if (data.selectedType === "IfcReal") {
-      newValue = parseFloat(newValue);
-    }
-    setLocalValue(newValue);
-  };
-
-  const handleNameBlur = () => {
-    data.onChange(data.id, localLabel, data.selectedType, localValue);
-    setIsEditing(false);
-  };
-
-  const handleNameKeyDown = (event) => {
-    if (event.key === "Enter") {
-      handleNameBlur();
-    }
-  };
-
-  const handleSelectChange = (event) => {
-    const newType = event.target.value;
-    let newValue;
-
-    setPreviousValues((prev) => ({ ...prev, [data.selectedType]: localValue }));
-
-    if (previousValues[newType] !== undefined) {
-      newValue = previousValues[newType];
-    } else {
-      switch (newType) {
-        case "IfcBoolean":
-          newValue = false;
-          break;
-        case "IfcInteger":
-          newValue = 0;
-          break;
-        case "IfcReal":
-          newValue = 0.0;
-          break;
-        default:
-          newValue = "";
-      }
-    }
-
-    setLocalValue(newValue);
-    data.onChange(data.id, localLabel, newType, newValue);
-  };
-
-  const renderValueInput = () => {
-    switch (data.selectedType) {
-      case "IfcBoolean":
-        return (
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={localValue}
-              onChange={handleValueChange}
-            />
-            <span className="slider round"></span>
-          </label>
-        );
-      case "IfcInteger":
-        return (
-          <input
-            type="number"
-            value={localValue}
-            onChange={handleValueChange}
-            className="property-input number"
-          />
-        );
-      case "IfcReal":
-        return (
-          <input
-            type="number"
-            value={localValue}
-            onChange={handleValueChange}
-            className="property-input number"
-          />
-        );
-      default:
-        return (
-          <input
-            type="text"
-            value={localValue}
-            onChange={handleValueChange}
-            className="property-input text"
-          />
-        );
-    }
-  };
-
-  return (
-    <div className="property-node">
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{
-          width: "12px",
-          height: "12px",
-        }}
-      />
-      <div className="property-content">
-        <div className="property-header">
-          {isEditing ? (
-            <input
-              type="text"
-              value={localLabel}
-              onChange={handleNameChange}
-              onBlur={handleNameBlur}
-              onKeyDown={handleNameKeyDown}
-              autoFocus
-              className="property-name-input"
-            />
-          ) : (
-            <div className="property-name" onClick={() => setIsEditing(true)}>
-              {localLabel}
-            </div>
-          )}
-          <select
-            onChange={handleSelectChange}
-            value={data.selectedType}
-            className="property-type-select"
-          >
-            <option value="IfcText">IfcText</option>
-            <option value="IfcBoolean">IfcBoolean</option>
-            <option value="IfcInteger">IfcInteger</option>
-            <option value="IfcReal">IfcReal</option>
-            <option value="IfcLabel">IfcLabel</option>
-            <option value="IfcIdentifier">IfcIdentifier</option>
-            <option value="IfcClassification">IfcClassification</option>
-          </select>
-        </div>
-        <div className="property-value">{renderValueInput()}</div>
-      </div>
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{
-          width: "12px",
-          height: "12px",
-        }}
-      />
-    </div>
-  );
-};
-
-const PropertySetNode = ({ data }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [localName, setLocalName] = useState(data.name);
-  const [localColor, setLocalColor] = useState(data.color);
-  const inputRef = useRef(null);
-  const colorRef = useRef(null);
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
-
-  const handleDoubleClick = () => {
-    setIsEditing(true);
-  };
-
-  const handleNameChange = (event) => {
-    setLocalName(event.target.value);
-  };
-
-  const handleColorChange = (event) => {
-    const newColor = event.target.value;
-    setLocalColor(newColor);
-    data.onChange(data.id, localName, newColor);
-  };
-
-  const handleBlur = () => {
-    if (localName.trim() !== "") {
-      data.onChange(data.id, localName, localColor);
-    } else {
-      setLocalName(data.name);
-      setLocalColor(data.color);
-    }
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (event) => {
-    if (event.key === "Enter") {
-      handleBlur();
-    } else if (event.key === "Escape") {
-      setLocalName(data.name);
-      setLocalColor(data.color);
-      setIsEditing(false);
-    }
-  };
-
-  const openColorPicker = (event) => {
-    event.stopPropagation();
-    colorRef.current.click();
-  };
-
-  const handleDelete = (event) => {
-    event.stopPropagation();
-    data.onDelete(data.id);
-  };
-
-  return (
-    <div
-      className={`property-set-node ${isEditing ? "editing" : ""}`}
-      onDoubleClick={handleDoubleClick}
-      style={{ backgroundColor: localColor }}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{ width: "12px", height: "12px" }}
-      />
-      <div className="property-set-content">
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={localName}
-            onChange={handleNameChange}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="property-set-name-input"
-          />
-        ) : (
-          <div className="property-set-name">{localName}</div>
-        )}
-      </div>
-      <div className="property-set-color-container">
-        <input
-          ref={colorRef}
-          type="color"
-          value={localColor}
-          onChange={handleColorChange}
-          className="property-set-color-input"
-        />
-        <div
-          className="property-set-color-dot"
-          style={{ backgroundColor: localColor }}
-          onClick={openColorPicker}
-        ></div>
-      </div>
-      {isEditing && (
-        <button className="delete-button" onClick={handleDelete}>
-          ×
-        </button>
-      )}
-    </div>
-  );
-};
-
-const EdgeWithButton = ({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  style = {},
-  markerEnd,
-  data,
-}) => {
-  const edgePath = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-
-  const edgeCenterX = (sourceX + targetX) / 2;
-  const edgeCenterY = (sourceY + targetY) / 2;
-
-  const onEdgeClick = (evt, id) => {
-    evt.stopPropagation();
-    if (data && data.removeEdge) {
-      data.removeEdge(id);
-    }
-  };
-
-  return (
-    <>
-      <path
-        id={id}
-        style={style}
-        className="react-flow__edge-path"
-        d={edgePath}
-        markerEnd={markerEnd}
-      />
-      <foreignObject
-        width={20}
-        height={20}
-        x={edgeCenterX - 10}
-        y={edgeCenterY - 10}
-        className="edgebutton-foreignobject"
-        requiredExtensions="http://www.w3.org/1999/xhtml"
-      >
-        <div>
-          <RemoveIcon onClick={(event) => onEdgeClick(event, id)} />
-        </div>
-      </foreignObject>
-    </>
-  );
-};
-
-const CustomEdge = ({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  style = {},
-  data,
-  animated,
-}) => {
-  const [edgePath] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-
-  const edgeCenterX = (sourceX + targetX) / 2;
-  const edgeCenterY = (sourceY + targetY) / 2;
-
-  const onEdgeClick = (evt, id) => {
-    evt.stopPropagation();
-    if (data && data.removeEdge) {
-      data.removeEdge(id);
-    }
-  };
-
-  return (
-    <>
-      <path
-        id={id}
-        style={{
-          ...style,
-          strokeWidth: 2,
-          stroke: "#888",
-          fill: "none",
-          strokeDasharray: animated ? "5,5" : "none",
-        }}
-        className={`react-flow__edge-path ${animated ? "animated" : ""}`}
-        d={edgePath}
-      />
-      <foreignObject
-        width={20}
-        height={20}
-        x={edgeCenterX - 10}
-        y={edgeCenterY - 10}
-        className="edgebutton-foreignobject"
-        requiredExtensions="http://www.w3.org/1999/xhtml"
-      >
-        <div>
-          <RemoveIcon
-            onClick={(event) => onEdgeClick(event, id)}
-            style={{ color: "red", cursor: "pointer" }}
-          />
-        </div>
-      </foreignObject>
-    </>
-  );
-};
+import CustomNode from "./components/CustomNode";
+import PropertyNode from "./components/PropertyNode";
+import PropertySetNode from "./components/PropertySetNode";
+import EdgeWithButton from "./components/EdgeWithButton";
+import CustomEdge from "./components/CustomEdge";
+import { processIFCFile, getMaterialColor } from "./utils/ifcUtils";
+import UploadPanel from "./components/UploadPanel";
+import PropertyPanel from "./components/PropertyPanel";
+import PropertySetPanel from "./components/PropertySetPanel";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -466,420 +45,8 @@ const nodeTypes = {
 };
 
 const edgeTypes = {
-  default: EdgeWithButton,
-  custom: CustomEdge,
+  custom: EdgeWithButton,
 };
-
-const PropertyPanel = forwardRef(
-  (
-    {
-      properties,
-      addProperty,
-      updateProperty,
-      deleteProperty,
-      isFixed,
-      setIsFixed,
-    },
-    ref
-  ) => {
-    const [isCollapsed, setIsCollapsed] = useState(true);
-    const [isCollapsing, setIsCollapsing] = useState(false);
-    const [newPropertyName, setNewPropertyName] = useState("");
-    const [newPropertyType, setNewPropertyType] = useState("IfcText");
-    const [editingPropertyId, setEditingPropertyId] = useState(null);
-    const panelRef = useRef(null);
-    const timeoutRef = useRef(null);
-    const inputRef = useRef(null);
-
-    const handleMouseEnter = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      setIsCollapsed(false);
-      setIsCollapsing(false);
-    };
-
-    const handleMouseLeave = () => {
-      if (!isFixed) {
-        setIsCollapsing(true);
-        timeoutRef.current = setTimeout(() => {
-          setIsCollapsed(true);
-          setIsCollapsing(false);
-        }, 3000);
-      }
-    };
-
-    useEffect(() => {
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-      };
-    }, []);
-
-    useEffect(() => {
-      if (!isCollapsed && panelRef.current) {
-        const contentHeight = panelRef.current.scrollHeight;
-        panelRef.current.style.height = `${contentHeight}px`;
-      }
-    }, [isCollapsed, properties]);
-
-    useEffect(() => {
-      if (editingPropertyId && inputRef.current) {
-        inputRef.current.focus();
-      }
-    }, [editingPropertyId]);
-
-    const handlePropertyNameClick = (propertyId) => {
-      setEditingPropertyId(propertyId);
-    };
-
-    const handlePropertyNameChange = (e, propertyId) => {
-      const newName = e.target.value;
-      updateProperty(
-        propertyId,
-        newName,
-        properties.find((p) => p.id === propertyId).type
-      );
-    };
-
-    const handlePropertyNameBlur = () => {
-      setEditingPropertyId(null);
-    };
-
-    const handlePropertyNameKeyDown = (e) => {
-      if (e.key === "Enter") {
-        setEditingPropertyId(null);
-      }
-    };
-
-    return (
-      <Panel
-        position="right"
-        className={`property-panel ${isCollapsed ? "collapsed" : ""} ${
-          isCollapsing ? "collapsing" : ""
-        }`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        ref={panelRef}
-      >
-        <div className="panel-header">
-          <h3>Property Launcher:</h3>
-          <label className="fix-checkbox">
-            <input
-              type="checkbox"
-              checked={isFixed}
-              onChange={() => setIsFixed(!isFixed)}
-            />
-            <FaThumbtack size={16} />
-          </label>
-        </div>
-        {!isCollapsed && (
-          <div className="property-content">
-            <p>Add, edit, or remove properties from your IFC layers.</p>
-            {properties.map((prop) => (
-              <div key={prop.id} className="property-item">
-                {editingPropertyId === prop.id ? (
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={prop.name}
-                    onChange={(e) => handlePropertyNameChange(e, prop.id)}
-                    onBlur={handlePropertyNameBlur}
-                    onKeyDown={handlePropertyNameKeyDown}
-                  />
-                ) : (
-                  <div onClick={() => handlePropertyNameClick(prop.id)}>
-                    {prop.name}
-                  </div>
-                )}
-                <select
-                  value={prop.type}
-                  onChange={(e) =>
-                    updateProperty(prop.id, prop.name, e.target.value)
-                  }
-                  title="Select property type"
-                >
-                  <option value="IfcText">IfcText</option>
-                  <option value="IfcBoolean">IfcBoolean</option>
-                  <option value="IfcInteger">IfcInteger</option>
-                  <option value="IfcReal">IfcReal</option>
-                  <option value="IfcLabel">IfcLabel</option>
-                  <option value="IfcIdentifier">IfcIdentifier</option>
-                  <option value="IfcClassification">IfcClassification</option>
-                </select>
-                <button
-                  onClick={() => deleteProperty(prop.id)}
-                  title="Delete property"
-                >
-                  X
-                </button>
-              </div>
-            ))}
-            <div className="add-property">
-              <input
-                type="text"
-                value={newPropertyName}
-                onChange={(e) => setNewPropertyName(e.target.value)}
-                placeholder="New property name"
-              />
-              <select
-                value={newPropertyType}
-                onChange={(e) => setNewPropertyType(e.target.value)}
-                title="Select new property type"
-              >
-                <option value="IfcText">IfcText</option>
-                <option value="IfcBoolean">IfcBoolean</option>
-                <option value="IfcInteger">IfcInteger</option>
-                <option value="IfcReal">IfcReal</option>
-                <option value="IfcLabel">IfcLabel</option>
-                <option value="IfcIdentifier">IfcIdentifier</option>
-                <option value="IfcClassification">IfcClassification</option>
-              </select>
-              <button
-                className="add-button"
-                onClick={() => {
-                  if (newPropertyName) {
-                    addProperty(newPropertyName, newPropertyType);
-                    setNewPropertyName("");
-                    setNewPropertyType("IfcText");
-                  }
-                }}
-                title="Add new property"
-              >
-                Add Property
-              </button>
-            </div>
-          </div>
-        )}
-        {isCollapsed && (
-          <div className="property-tab">
-            <FaList size={20} />
-            <span>Properties</span>
-          </div>
-        )}
-      </Panel>
-    );
-  }
-);
-
-// Add this new component for PropertySet Panel
-const PropertySetPanel = forwardRef(
-  ({ addPropertySet, isFixed, setIsFixed }, ref) => {
-    const [isCollapsed, setIsCollapsed] = useState(true);
-    const [isCollapsing, setIsCollapsing] = useState(false);
-    const [newPropertySetName, setNewPropertySetName] = useState("");
-    const panelRef = useRef(null);
-    const timeoutRef = useRef(null);
-
-    const handleMouseEnter = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      setIsCollapsed(false);
-      setIsCollapsing(false);
-    };
-
-    const handleMouseLeave = () => {
-      if (!isFixed) {
-        setIsCollapsing(true);
-        timeoutRef.current = setTimeout(() => {
-          setIsCollapsed(true);
-          setIsCollapsing(false);
-        }, 3000);
-      }
-    };
-
-    useEffect(() => {
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-      };
-    }, []);
-
-    return (
-      <Panel
-        position="top-right"
-        className={`propertyset-panel ${isCollapsed ? "collapsed" : ""} ${
-          isCollapsing ? "collapsing" : ""
-        }`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        ref={panelRef}
-        style={{ right: "370px" }}
-      >
-        {!isCollapsed && (
-          <>
-            <div className="panel-header">
-              <h3>PSet Launcher:</h3>
-              <label className="fix-checkbox">
-                <input
-                  type="checkbox"
-                  checked={isFixed}
-                  onChange={() => setIsFixed(!isFixed)}
-                />
-                <FaThumbtack size={16} />
-              </label>
-            </div>
-            <div className="propertyset-content">
-              <p>Add new PropertySets to structure properties.</p>
-              <div className="add-propertyset">
-                <input
-                  type="text"
-                  value={newPropertySetName}
-                  onChange={(e) => setNewPropertySetName(e.target.value)}
-                  placeholder="New PropertySet name"
-                />
-                <button
-                  onClick={() => {
-                    if (newPropertySetName) {
-                      addPropertySet(newPropertySetName);
-                      setNewPropertySetName("");
-                    }
-                  }}
-                >
-                  Add PropertySet
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-        {isCollapsed && (
-          <div className="propertyset-tab">
-            <FaLayerGroup size={20} />
-            <span>PropertySets</span>
-          </div>
-        )}
-      </Panel>
-    );
-  }
-);
-
-// Add this new component before the App component
-const UploadPanel = forwardRef(
-  (
-    {
-      isFixed,
-      setIsFixed,
-      onFileUpload,
-      ifcElements,
-      selectedElement,
-      onElementSelect,
-    },
-    ref
-  ) => {
-    const [isCollapsed, setIsCollapsed] = useState(true);
-    const [isCollapsing, setIsCollapsing] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const panelRef = useRef(null);
-    const timeoutRef = useRef(null);
-
-    const handleMouseEnter = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      setIsCollapsed(false);
-      setIsCollapsing(false);
-    };
-
-    const handleMouseLeave = () => {
-      if (!isFixed) {
-        setIsCollapsing(true);
-        timeoutRef.current = setTimeout(() => {
-          setIsCollapsed(true);
-          setIsCollapsing(false);
-        }, 3000);
-      }
-    };
-
-    useEffect(() => {
-      return () => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-      };
-    }, []);
-
-    const handleFileChange = async (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        setIsFixed(true); // Auto-pin the panel when upload starts
-        setIsLoading(true); // Set loading state to true
-        await onFileUpload(file);
-        setIsLoading(false); // Set loading state to false when upload is complete
-      }
-    };
-
-    const handleElementSelect = (e) => {
-      const selectedId = parseInt(e.target.value);
-      const element = ifcElements.find((el) => el.id === selectedId);
-      onElementSelect(element);
-      setIsFixed(false); // Unpin the panel after element is selected
-    };
-
-    return (
-      <Panel
-        position="top-left"
-        className={`upload-panel ${isCollapsed ? "collapsed" : ""} ${
-          isCollapsing ? "collapsing" : ""
-        }`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        ref={panelRef}
-      >
-        {!isCollapsed && (
-          <div className="panel-content">
-            <div className="panel-header">
-              <h3>IFC Uploader</h3>
-              <label className="fix-checkbox">
-                <input
-                  type="checkbox"
-                  checked={isFixed}
-                  onChange={() => setIsFixed(!isFixed)}
-                />
-                <FaThumbtack size={16} />
-              </label>
-            </div>
-            <div className="upload-content">
-              <p>
-                Upload an IFC file and select elements with multiple layers.
-              </p>
-              <input type="file" onChange={handleFileChange} accept=".ifc" />
-              {isLoading && (
-                <div className="loading-indicator">
-                  <FaSpinner className="spinner" />
-                  <span>Loading IFC file...</span>
-                </div>
-              )}
-              {ifcElements.length > 0 ? (
-                <select
-                  value={selectedElement ? selectedElement.id : ""}
-                  onChange={handleElementSelect}
-                >
-                  <option value="">Select element with multiple layers</option>
-                  {ifcElements.map((element) => (
-                    <option key={element.id} value={element.id}>
-                      {element.name} ({element.type})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p>No elements with multiple layers found</p>
-              )}
-            </div>
-          </div>
-        )}
-        {isCollapsed && (
-          <div className="panel-tab">
-            <FaUpload size={20} />
-            <span>Upload</span>
-          </div>
-        )}
-      </Panel>
-    );
-  }
-);
 
 const App = () => {
   const [appState, setAppState] = useState({
@@ -894,8 +61,12 @@ const App = () => {
     propertySet: false,
   });
 
+  // Ensure ifcElements is properly initialized
   const [ifcElements, setIfcElements] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
+
+  // Add this new state to store canvas states for each element
+  const [elementCanvasStates, setElementCanvasStates] = useState({});
 
   const { fitView, getNodes, getViewport } = useReactFlow();
 
@@ -1041,44 +212,85 @@ const App = () => {
     (edgeId) => {
       updateAppState((prevState) => {
         const edgeToRemove = prevState.edges.find((edge) => edge.id === edgeId);
+        if (!edgeToRemove) return prevState;
+
+        let updatedProperties = prevState.properties;
+
+        // If it's a property-to-propertySet edge
         if (
-          edgeToRemove &&
           edgeToRemove.source.startsWith("property-") &&
           edgeToRemove.target.startsWith("propertyset-")
         ) {
-          const updatedProperties = prevState.properties.map((prop) =>
+          updatedProperties = prevState.properties.map((prop) =>
             prop.id === edgeToRemove.source
               ? { ...prop, propertySetId: null, isConnected: false }
               : prop
           );
-          return {
-            ...prevState,
-            edges: prevState.edges.filter((edge) => edge.id !== edgeId),
-            properties: updatedProperties,
-          };
         }
-        // For other edge types (including property-to-layer), just remove the edge
+
         return {
           ...prevState,
           edges: prevState.edges.filter((edge) => edge.id !== edgeId),
+          properties: updatedProperties,
         };
       });
     },
     [updateAppState]
   );
 
+  // Add this new state to track temporary edges
+  const [tempEdges, setTempEdges] = useState([]);
+
+  // Helper function to check if a property is already connected to a propertySet
+  const isAlreadyConnected = useCallback(
+    (sourceId) => {
+      return appState.edges.some(
+        (edge) =>
+          edge.source === sourceId && edge.target.startsWith("propertyset-")
+      );
+    },
+    [appState.edges]
+  );
+
   const onConnect = useCallback(
     (params) => {
-      // Prevent direct connections between material (layer) nodes and property set nodes
-      if (
+      const isLayerToPset =
         (params.source.startsWith("layer-") &&
           params.target.startsWith("propertyset-")) ||
         (params.source.startsWith("propertyset-") &&
-          params.target.startsWith("layer-"))
+          params.target.startsWith("layer-"));
+
+      const isPropertyToPset =
+        params.source.startsWith("property-") &&
+        params.target.startsWith("propertyset-");
+
+      if (
+        isLayerToPset ||
+        (isPropertyToPset && isAlreadyConnected(params.source))
       ) {
-        return; // Don't create the connection
+        // Create a temporary edge for the warning animation
+        const tempEdge = {
+          ...params,
+          id: `temp-${params.source}-${params.target}`,
+          type: "custom",
+          animated: true,
+          style: { stroke: "red" },
+          data: { removeEdge, isTemp: true },
+        };
+
+        setTempEdges((prev) => [...prev, tempEdge]);
+
+        // Remove the temporary edge after 3 seconds
+        setTimeout(() => {
+          setTempEdges((prev) =>
+            prev.filter((edge) => edge.id !== tempEdge.id)
+          );
+        }, 3000);
+
+        return; // Don't create the permanent connection
       }
 
+      // For valid connections
       const newEdge = {
         ...params,
         type: "custom",
@@ -1087,55 +299,29 @@ const App = () => {
         data: { removeEdge },
       };
 
-      // Allow connections from layer nodes to property nodes
-      if (
-        params.source.startsWith("layer-") &&
-        params.target.startsWith("property-")
-      ) {
-        updateAppState((prevState) => ({
-          ...prevState,
-          edges: addEdge(newEdge, prevState.edges),
-        }));
-      } else if (params.source.startsWith("property-")) {
-        if (params.target.startsWith("propertyset-")) {
-          // Property to PropertySet connection
-          updateAppState((prevState) => {
-            const isAlreadyConnected = prevState.edges.some(
-              (edge) =>
-                edge.source === params.source &&
-                edge.target.startsWith("propertyset-")
-            );
-
-            if (isAlreadyConnected) {
-              return prevState;
-            }
-
-            const updatedProperties = prevState.properties.map((prop) =>
-              prop.id === params.source ? { ...prop, isConnected: true } : prop
-            );
-
-            return {
-              ...prevState,
-              edges: addEdge(newEdge, prevState.edges),
-              properties: updatedProperties,
-            };
-          });
-        } else {
-          // Property to any other node type (including layers)
-          updateAppState((prevState) => ({
+      updateAppState((prevState) => {
+        // If it's a property-to-propertySet connection, update the property's propertySetId
+        if (isPropertyToPset) {
+          const updatedProperties = prevState.properties.map((prop) =>
+            prop.id === params.source
+              ? { ...prop, propertySetId: params.target, isConnected: true }
+              : prop
+          );
+          return {
             ...prevState,
             edges: addEdge(newEdge, prevState.edges),
-          }));
+            properties: updatedProperties,
+          };
         }
-      } else {
-        // Any other connection type
-        updateAppState((prevState) => ({
+
+        // For other valid connection types
+        return {
           ...prevState,
           edges: addEdge(newEdge, prevState.edges),
-        }));
-      }
+        };
+      });
     },
-    [updateAppState, removeEdge]
+    [updateAppState, removeEdge, isAlreadyConnected]
   );
 
   const handlePropertySetNameChange = useCallback(
@@ -1235,29 +421,6 @@ const App = () => {
   );
 
   // Move utility functions here, before they are used
-  const getMaterialColor = (material) => {
-    switch (material) {
-      case "Concrete":
-        return "#bfbfbf";
-      case "Insulation":
-        return "#f0e68c";
-      case "Wood":
-        return "#deb887";
-      case "Steel":
-        return "#708090";
-      case "Glass":
-        return "#add8e6";
-      case "Gypsum":
-        return "#f5f5f5";
-      case "Aluminum":
-        return "#a9a9a9";
-      case "Brick":
-        return "#d2691e";
-      default:
-        return "#ffffff"; // Default color for unknown materials
-    }
-  };
-
   const getPropertyNodeColor = (type) => {
     switch (type) {
       case "IfcText":
@@ -1282,15 +445,7 @@ const App = () => {
   const handleFileUpload = useCallback(async (file) => {
     console.log("File upload started:", file);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      console.log("File converted to ArrayBuffer");
-      const ifcData = await loadIFC(arrayBuffer);
-      console.log("IFC data loaded:", ifcData);
-
-      // Filter elements with multiple layers
-      const elementsWithMultiLayers = ifcData.filter(
-        (element) => element.layers && element.layers.length > 1
-      );
+      const elementsWithMultiLayers = await processIFCFile(file);
       console.log("Elements with multiple layers:", elementsWithMultiLayers);
       setIfcElements(elementsWithMultiLayers);
 
@@ -1305,17 +460,89 @@ const App = () => {
 
   const handleElementSelect = useCallback(
     (element) => {
-      setSelectedElement(element);
-      // Clear existing layers when a new element is selected
-      updateAppState((prevState) => ({
-        ...prevState,
-        layers: [],
-        properties: [],
-        propertySets: [],
-        edges: [],
-      }));
+      // Save current canvas state before switching
+      if (selectedElement || selectedElement === null) {
+        const currentStateKey = selectedElement
+          ? selectedElement.id
+          : "example";
+        setElementCanvasStates((prev) => ({
+          ...prev,
+          [currentStateKey]: {
+            ...appState,
+          },
+        }));
+      }
+
+      if (element) {
+        setSelectedElement(element);
+
+        // Load saved canvas state if it exists, otherwise initialize with empty state
+        if (elementCanvasStates[element.id]) {
+          updateAppState((prevState) => ({
+            ...prevState,
+            ...elementCanvasStates[element.id],
+          }));
+        } else {
+          updateAppState((prevState) => ({
+            ...prevState,
+            layers: element.layers.map((layer, index) => ({
+              ...layer,
+              id: `layer-${element.id}-${index}`,
+              yOffset: index * (parseInt(layer.thickness) + nodeHeightOffset),
+            })),
+            properties: [],
+            propertySets: [],
+            edges: [],
+          }));
+        }
+      } else {
+        // If null is passed (for "Example Buildup"), load the saved state or initial layers
+        setSelectedElement(null);
+        if (elementCanvasStates["example"]) {
+          updateAppState((prevState) => ({
+            ...prevState,
+            ...elementCanvasStates["example"],
+          }));
+        } else {
+          fetch("/layers.json")
+            .then((response) => response.json())
+            .then((data) => {
+              let yOffset = 0;
+              const layersWithIds = data.map((layer) => {
+                const newLayer = {
+                  ...layer,
+                  id: `layer-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substr(2, 9)}`,
+                  yOffset: yOffset,
+                };
+                yOffset += parseInt(layer.thickness) + nodeHeightOffset;
+                return newLayer;
+              });
+              updateAppState((prevState) => ({
+                ...prevState,
+                layers: layersWithIds,
+                properties: [],
+                propertySets: [],
+                edges: [],
+              }));
+            });
+        }
+      }
+
+      // Zoom to fit the new elements after a short delay
+      setTimeout(() => {
+        fitView({ padding: 0.2, includeHiddenNodes: false });
+      }, 100);
     },
-    [updateAppState]
+    [
+      updateAppState,
+      selectedElement,
+      elementCanvasStates,
+      appState,
+      nodeHeightOffset,
+      fitView,
+    ]
   );
 
   const handlePanelFixChange = (panelName, isFixed) => {
@@ -1459,14 +686,13 @@ const App = () => {
     <div style={{ height: "100vh", width: "100%" }}>
       <ReactFlow
         nodes={nodes}
-        edges={appState.edges}
+        edges={[...appState.edges, ...tempEdges]}
         onConnect={onConnect}
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        // Remove the onNodesChange prop to prevent fitting on all node changes
         nodesConnectable={true}
         edgesUpdatable={true}
         elementsSelectable={true}
@@ -1475,7 +701,6 @@ const App = () => {
         <Background />
         <Controls />
 
-        {/* Upload Panel */}
         <UploadPanel
           isFixed={isPanelFixed.upload}
           setIsFixed={(isFixed) => handlePanelFixChange("upload", isFixed)}
@@ -1485,7 +710,6 @@ const App = () => {
           onElementSelect={handleElementSelect}
         />
 
-        {/* Property Panel */}
         <PropertyPanel
           properties={appState.properties}
           addProperty={addProperty}
@@ -1495,7 +719,6 @@ const App = () => {
           setIsFixed={(isFixed) => handlePanelFixChange("property", isFixed)}
         />
 
-        {/* PropertySet Panel */}
         <PropertySetPanel
           addPropertySet={addPropertySet}
           isFixed={isPanelFixed.propertySet}
