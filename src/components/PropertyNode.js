@@ -1,110 +1,122 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Handle, Position } from "reactflow";
 
 const PropertyNode = ({ data }) => {
-  const [localLabel, setLocalLabel] = useState(data.label);
-  const [localValue, setLocalValue] = useState(data.value || "");
-  const [isEditing, setIsEditing] = useState(false);
-  const [previousValues, setPreviousValues] = useState({});
+  const [name, setName] = useState(data.label);
+  const [type, setType] = useState(data.selectedType);
+  const [values, setValues] = useState({
+    IfcText: "",
+    IfcBoolean: false,
+    IfcInteger: "",
+    IfcReal: "",
+    IfcLabel: "",
+    IfcIdentifier: "",
+    IfcClassification: "",
+  });
+  const valueInputRef = useRef(null);
 
   useEffect(() => {
-    setLocalLabel(data.label);
-    setLocalValue(data.value || "");
-  }, [data.label, data.value]);
+    setName(data.label);
+    setType(data.selectedType);
+    setValues((prevValues) => ({
+      ...prevValues,
+      [data.selectedType]: data.value || prevValues[data.selectedType],
+    }));
+  }, [data.id, data.label, data.selectedType, data.value]);
 
-  const handleNameChange = (event) => {
-    setLocalLabel(event.target.value);
-  };
+  const handleNameChange = useCallback(
+    (e) => {
+      const newName = e.target.value;
+      setName(newName);
+      data.onChange(data.id, newName, type, values[type]);
+    },
+    [data, type, values]
+  );
 
-  const handleValueChange = (event) => {
-    let newValue = event.target.value;
-    if (data.selectedType === "IfcBoolean") {
-      newValue = event.target.checked;
-    } else if (data.selectedType === "IfcInteger") {
-      newValue = parseInt(newValue, 10);
-    } else if (data.selectedType === "IfcReal") {
-      newValue = parseFloat(newValue);
-    }
-    setLocalValue(newValue);
-  };
+  const handleTypeChange = useCallback(
+    (e) => {
+      const newType = e.target.value;
+      setType(newType);
+      data.onChange(data.id, name, newType, values[newType]);
+    },
+    [data, name, values]
+  );
 
-  const handleNameBlur = () => {
-    data.onChange(data.id, localLabel, data.selectedType, localValue);
-    setIsEditing(false);
-  };
-
-  const handleNameKeyDown = (event) => {
-    if (event.key === "Enter") {
-      handleNameBlur();
-    }
-  };
-
-  const handleSelectChange = (event) => {
-    const newType = event.target.value;
-    let newValue;
-
-    setPreviousValues((prev) => ({ ...prev, [data.selectedType]: localValue }));
-
-    if (previousValues[newType] !== undefined) {
-      newValue = previousValues[newType];
-    } else {
-      switch (newType) {
+  const handleValueChange = useCallback(
+    (e) => {
+      let newValue;
+      switch (type) {
         case "IfcBoolean":
-          newValue = false;
+          newValue = e.target.checked;
           break;
         case "IfcInteger":
-          newValue = 0;
+          newValue = e.target.value.replace(/[^0-9-]/g, "");
           break;
         case "IfcReal":
-          newValue = 0.0;
+          newValue = e.target.value.replace(/[^0-9.-]/g, "");
           break;
         default:
-          newValue = "";
+          newValue = e.target.value;
+          break;
       }
-    }
+      setValues((prevValues) => ({
+        ...prevValues,
+        [type]: newValue,
+      }));
+    },
+    [type]
+  );
 
-    setLocalValue(newValue);
-    data.onChange(data.id, localLabel, newType, newValue);
-  };
+  const handleValueBlur = useCallback(() => {
+    data.onChange(data.id, name, type, values[type]);
+  }, [data, name, type, values]);
 
   const renderValueInput = () => {
-    switch (data.selectedType) {
+    switch (type) {
       case "IfcBoolean":
         return (
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={localValue}
-              onChange={handleValueChange}
-            />
-            <span className="slider round"></span>
-          </label>
+          <input
+            type="checkbox"
+            checked={values.IfcBoolean}
+            onChange={handleValueChange}
+            onBlur={handleValueBlur}
+            className="property-input boolean"
+          />
         );
       case "IfcInteger":
         return (
           <input
             type="number"
-            value={localValue}
+            value={values.IfcInteger}
             onChange={handleValueChange}
-            className="property-input number"
+            onBlur={handleValueBlur}
+            className="property-input integer"
+            step="1"
+            ref={valueInputRef}
           />
         );
       case "IfcReal":
         return (
           <input
             type="number"
-            value={localValue}
+            value={values.IfcReal}
             onChange={handleValueChange}
-            className="property-input number"
+            onBlur={handleValueBlur}
+            className="property-input real"
+            step="any"
+            ref={valueInputRef}
           />
         );
       default:
         return (
           <input
             type="text"
-            value={localValue}
+            value={values[type]}
             onChange={handleValueChange}
+            onBlur={handleValueBlur}
             className="property-input text"
+            placeholder="Value"
+            ref={valueInputRef}
           />
         );
     }
@@ -115,31 +127,22 @@ const PropertyNode = ({ data }) => {
       <Handle
         type="target"
         position={Position.Left}
-        style={{
-          width: "12px",
-          height: "12px",
-        }}
+        style={{ top: "50%", transform: "translateY(-50%)" }}
       />
       <div className="property-content">
-        <div className="property-header">
-          {isEditing ? (
-            <input
-              type="text"
-              value={localLabel}
-              onChange={handleNameChange}
-              onBlur={handleNameBlur}
-              onKeyDown={handleNameKeyDown}
-              autoFocus
-              className="property-name-input"
-            />
-          ) : (
-            <div className="property-name" onClick={() => setIsEditing(true)}>
-              {localLabel}
-            </div>
-          )}
+        <div className="property-row">
+          <input
+            type="text"
+            value={name}
+            onChange={handleNameChange}
+            className="property-name-input"
+            placeholder="Property Name"
+          />
+        </div>
+        <div className="property-row">
           <select
-            onChange={handleSelectChange}
-            value={data.selectedType}
+            value={type}
+            onChange={handleTypeChange}
             className="property-type-select"
           >
             <option value="IfcText">IfcText</option>
@@ -151,18 +154,15 @@ const PropertyNode = ({ data }) => {
             <option value="IfcClassification">IfcClassification</option>
           </select>
         </div>
-        <div className="property-value">{renderValueInput()}</div>
+        <div className="property-row">{renderValueInput()}</div>
       </div>
       <Handle
         type="source"
         position={Position.Right}
-        style={{
-          width: "12px",
-          height: "12px",
-        }}
+        style={{ top: "50%", transform: "translateY(-50%)" }}
       />
     </div>
   );
 };
 
-export default PropertyNode;
+export default React.memo(PropertyNode);

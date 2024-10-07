@@ -153,54 +153,38 @@ input[type="text"] {
   stroke: #888;
 }
 
-.property-container {
-  width: 300px;
-  position: relative;
-  overflow-y: auto;
-  background-color: #f0f0f0;
-  padding: 10px;
-}
-
 .property-node {
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 12px;
-  width: 250px;
-  height: 100px; /* Increased from 80px to 100px */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
+  width: 240px; /* Reduced from 250px */
+  height: auto;
+  min-height: 120px;
+  padding-right: 20px;
 }
 
-.property-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  justify-content: space-between;
+.property-name-input,
+.property-type-select,
+.property-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
-.property-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+.property-type-select {
+  width: 100%;
+}
+
+.property-input.boolean {
+  width: auto;
+  margin-right: 5px;
 }
 
 .property-name,
 .property-name-input {
   font-weight: 600;
-  font-size: 14px;
-  color: #333;
-  flex-grow: 1;
-  margin-right: 8px;
-}
-
-.property-name-input {
-  border: none;
-  border-bottom: 1px solid #ddd;
-  padding: 2px 0;
-  outline: none;
 }
 
 .property-type-select {
@@ -209,74 +193,6 @@ input[type="text"] {
   border-radius: 4px;
   border: 1px solid #ddd;
   background-color: #f5f5f5;
-}
-
-.property-value {
-  display: flex;
-  align-items: center;
-  margin-top: 8px; /* Increased from 4px to 8px */
-}
-
-.property-input {
-  width: 100%;
-  padding: 4px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.property-input.number {
-  width: 80px;
-}
-
-.property-input.text {
-  width: 100%;
-}
-
-/* Adjust the switch styles for boolean input */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: 0.4s;
-  border-radius: 20px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 14px;
-  width: 14px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #2196f3;
-}
-
-input:checked + .slider:before {
-  transform: translateX(20px);
 }
 
 .sidebar-tab {
@@ -847,7 +763,6 @@ input:checked + .slider:before {
   align-items: center;
   justify-content: center;
   transition: background-color 0.3s ease;
-  z-index: 10; /* Ensure it's above other elements */
 }
 
 .delete-button:hover {
@@ -1749,4 +1664,110 @@ input:checked + .slider:before {
   justify-content: center;
   align-items: center;
   min-height: 40px;
+}
+
+.export-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  z-index: 1000;
+}
+
+.export-button:hover {
+  background-color: #45a049;
+}
+
+.export-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.property-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.property-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.property-name-input,
+.property-type-select,
+.property-input {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.property-type-select {
+  min-width: 80px;
+}
+
+.property-input.boolean {
+  width: auto;
+  margin-right: 4px;
+  padding: 6px;
+}
+
+.property-input.integer,
+.property-input.real,
+.property-input.text {
+  width: 100%;
+  padding: 6px;
+}
+
+/* ... (rest of the styles remain unchanged) */
+
+/* Add these styles to your existing App.css file */
+
+/* Style for all handles */
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background-color: #555;
+  border: 2px solid white;
+}
+
+/* Specific styles for property node handles */
+.property-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background-color: #555;
+  border: 2px solid white;
+}
+
+/* Hover effect for handles */
+.react-flow__handle:hover {
+  background-color: #777;
+}
+
+/* Style for custom node handles (if needed) */
+.custom-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background-color: #555;
+  border: 2px solid white;
+}
+
+/* Style for property set node handles (if needed) */
+.property-set-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background-color: #555;
+  border: 2px solid white;
 }

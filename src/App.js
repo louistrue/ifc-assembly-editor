@@ -33,10 +33,16 @@ import PropertyNode from "./components/PropertyNode";
 import PropertySetNode from "./components/PropertySetNode";
 import EdgeWithButton from "./components/EdgeWithButton";
 import CustomEdge from "./components/CustomEdge";
-import { processIFCFile, getMaterialColor } from "./utils/ifcUtils";
+import {
+  processIFCFile,
+  getMaterialColor,
+  base64ToArrayBuffer,
+} from "./utils/ifcUtils";
 import UploadPanel from "./components/UploadPanel";
 import PropertyPanel from "./components/PropertyPanel";
 import PropertySetPanel from "./components/PropertySetPanel";
+import ExportButton from "./components/ExportButton";
+import { exportIFC } from "./utils/ifcExporter";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -87,7 +93,16 @@ const App = () => {
       updateAppState((prevState) => {
         const updatedProperties = prevState.properties.map((prop) =>
           prop.id === nodeId
-            ? { ...prop, name: newName, type: newType, value: newValue }
+            ? {
+                ...prop,
+                name: newName,
+                type: newType,
+                value: newValue,
+                values: {
+                  ...prop.values,
+                  [newType]: newValue,
+                },
+              }
             : prop
         );
         return { ...prevState, properties: updatedProperties };
@@ -460,21 +475,23 @@ const App = () => {
 
   const handleElementSelect = useCallback(
     (element) => {
-      // Save current canvas state before switching
-      if (selectedElement || selectedElement === null) {
-        const currentStateKey = selectedElement
-          ? selectedElement.id
-          : "example";
-        setElementCanvasStates((prev) => ({
-          ...prev,
-          [currentStateKey]: {
-            ...appState,
-          },
-        }));
-      }
-
       if (element) {
-        setSelectedElement(element);
+        // Convert the base64 string back to ArrayBuffer
+        const arrayBuffer = base64ToArrayBuffer(element.arrayBuffer);
+        setSelectedElement({ ...element, arrayBuffer });
+
+        // Save current canvas state before switching
+        if (selectedElement || selectedElement === null) {
+          const currentStateKey = selectedElement
+            ? selectedElement.id
+            : "example";
+          setElementCanvasStates((prev) => ({
+            ...prev,
+            [currentStateKey]: {
+              ...appState,
+            },
+          }));
+        }
 
         // Load saved canvas state if it exists, otherwise initialize with empty state
         if (elementCanvasStates[element.id]) {
@@ -682,6 +699,64 @@ const App = () => {
       });
   }, [updateAppState, nodeHeightOffset]);
 
+  // Add this state variable inside the App component
+  const [exportWorker, setExportWorker] = useState(null);
+
+  // Add this useEffect hook to initialize the export worker
+  useEffect(() => {
+    const worker = new Worker(
+      new URL("./workers/exportWorker.js", import.meta.url)
+    );
+    setExportWorker(worker);
+
+    return () => {
+      worker.terminate();
+    };
+  }, []);
+
+  // Add this function inside the App component
+  const handleExport = async () => {
+    if (!exportWorker) {
+      console.error("Export worker not initialized");
+      alert("Export worker not initialized. Please try again.");
+      return;
+    }
+
+    if (!selectedElement || !selectedElement.arrayBuffer) {
+      console.error("No element selected or element has no arrayBuffer");
+      alert("Please select an element to export.");
+      return;
+    }
+
+    try {
+      const exportedIFC = await exportIFC(
+        exportWorker,
+        selectedElement,
+        appState.layers,
+        appState.properties,
+        appState.propertySets
+      );
+
+      if (!(exportedIFC instanceof ArrayBuffer)) {
+        throw new Error("Exported IFC is not an ArrayBuffer");
+      }
+
+      // Create a Blob from the ArrayBuffer
+      const blob = new Blob([exportedIFC], { type: "application/ifc" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "modified.ifc";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting IFC:", error);
+      alert(`Error exporting IFC: ${error.message}`);
+    }
+  };
+
   return (
     <div style={{ height: "100vh", width: "100%" }}>
       <ReactFlow
@@ -723,6 +798,11 @@ const App = () => {
           addPropertySet={addPropertySet}
           isFixed={isPanelFixed.propertySet}
           setIsFixed={(isFixed) => handlePanelFixChange("propertySet", isFixed)}
+        />
+
+        <ExportButton
+          onExport={handleExport}
+          disabled={!selectedElement || appState.layers.length === 0}
         />
       </ReactFlow>
     </div>

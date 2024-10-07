@@ -30,6 +30,7 @@ self.onmessage = async (event) => {
       import io
       import tempfile
       import json
+      import base64
 
       ifc_data = bytes(uint8Array)
       with tempfile.NamedTemporaryFile(suffix='.ifc', delete=False) as temp_file:
@@ -83,7 +84,8 @@ self.onmessage = async (event) => {
                       "id": element.id(),
                       "type": element.is_a(),
                       "name": element.Name if hasattr(element, "Name") else "Unnamed",
-                      "layers": []
+                      "layers": [],
+                      "arrayBuffer": base64.b64encode(ifc_data).decode('utf-8')  # Encode as base64 string
                   }
                   
                   for layer in layerset.MaterialLayers:
