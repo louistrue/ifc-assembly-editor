@@ -15,7 +15,7 @@ You can access the live application here: [IFC Layer Editor](https://ifc-assembl
 
 ## Getting Started
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Try the Preview App: [IFC Layer Editor](https://ifc-assembly-editor.vercel.app/)
 
 ### Prerequisites
 
