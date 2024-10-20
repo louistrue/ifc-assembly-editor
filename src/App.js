@@ -17,6 +17,10 @@ import ReactFlow, {
   ReactFlowProvider,
   getBezierPath,
   MarkerType,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  getConnectedEdges,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import "./App.css";
@@ -43,6 +47,7 @@ import PropertyPanel from "./components/PropertyPanel";
 import PropertySetPanel from "./components/PropertySetPanel";
 import ExportButton from "./components/ExportButton";
 import { exportIFC } from "./utils/ifcExporter";
+import "./StartingScreen.css";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -52,6 +57,85 @@ const nodeTypes = {
 
 const edgeTypes = {
   custom: EdgeWithButton,
+};
+
+const StartingScreen = ({ onClose }) => {
+  const handleOverlayClick = (event) => {
+    if (event.target.className === "starting-screen-overlay") {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="starting-screen-overlay" onClick={handleOverlayClick}>
+      <div className="starting-screen-content">
+        <div className="header">
+          <h1>IFC Layer Editor</h1>
+          <img
+            src={process.env.PUBLIC_URL + "/logo.png"}
+            alt="IFC Layer Editor Logo"
+            className="app-logo"
+          />
+        </div>
+        <p className="app-description">
+          An open-source tool for editing and enhancing IFC (Industry Foundation
+          Classes) files. Modify layer properties and export updated IFC models
+          with ease.
+        </p>
+        <div className="beta-warning">
+          <strong>Beta Version:</strong> This application is in beta. Some
+          features may be unstable or incomplete.
+        </div>
+        <div className="key-points">
+          <div className="key-point">
+            <h2>1. Upload IFC</h2>
+            <p>Upload your IFC file and view layers and properties.</p>
+          </div>
+          <div className="key-point">
+            <h2>2. Edit Layers</h2>
+            <p>Modify existing properties or add new custom ones.</p>
+          </div>
+          <div className="key-point">
+            <h2>3. Connect Properties</h2>
+            <p>
+              Link properties to layers using an intuitive visual interface.
+            </p>
+          </div>
+          <div className="key-point">
+            <h2>4. Export</h2>
+            <p>Generate a new IFC file with your modifications.</p>
+          </div>
+        </div>
+        <p className="limitations-note">
+          <strong>Note:</strong> Adding new layers or changing layer order is
+          currently not fully supported.
+        </p>
+        <p className="open-source-note">
+          This application is open-source. Contributions and feedback are
+          welcome!
+        </p>
+        <div className="links">
+          <a
+            href="https://github.com/louistrue/ifc-assembly-editor"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub Repository
+          </a>
+          <a
+            href="https://www.lt.plus/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            LT+ Website
+          </a>
+        </div>
+        <button className="start-button" onClick={onClose}>
+          Get Started
+        </button>
+      </div>
+    </div>
+  );
 };
 
 const App = () => {
@@ -722,19 +806,92 @@ const App = () => {
       return;
     }
 
-    if (!selectedElement || !selectedElement.arrayBuffer) {
-      console.error("No element selected or element has no arrayBuffer");
-      alert("Please select an element to export.");
-      return;
-    }
-
     try {
+      let allLayersWithProperties = [];
+      let allProperties = [];
+      let allPropertySets = [];
+
+      for (const element of ifcElements) {
+        if (!element.arrayBuffer) {
+          console.error(`Element ${element.id} has no arrayBuffer`);
+          continue;
+        }
+
+        // Load the canvas state for this specific element
+        const elementState = elementCanvasStates[element.id] || {
+          layers: element.layers,
+          properties: [],
+          edges: [],
+        };
+
+        // Get all nodes that represent layers for this element
+        const layerNodes = elementState.layers.map((layer, index) => ({
+          id: `ifc-layer-${element.id}-${index}`,
+          ...layer,
+        }));
+
+        // Get all edges connected to these layer nodes
+        const connectedEdges = elementState.edges.filter(
+          (edge) =>
+            edge.source.startsWith(`ifc-layer-${element.id}-`) ||
+            edge.target.startsWith(`ifc-layer-${element.id}-`)
+        );
+
+        console.log(
+          `Connected Edges for element ${element.id}:`,
+          connectedEdges
+        );
+
+        // Create a map of layer IDs to their connected properties
+        const layerPropertiesMap = connectedEdges.reduce((map, edge) => {
+          if (edge.source.startsWith(`ifc-layer-${element.id}-`)) {
+            if (!map[edge.source]) {
+              map[edge.source] = [];
+            }
+            map[edge.source].push(edge.target);
+          }
+          return map;
+        }, {});
+
+        console.log(
+          `Layer Properties Map for element ${element.id}:`,
+          layerPropertiesMap
+        );
+
+        const layersWithProperties = element.layers.map((layer, index) => {
+          const layerId = `ifc-layer-${element.id}-${index}`;
+          const connectedPropertyIds = layerPropertiesMap[layerId] || [];
+          const layerProperties = elementState.properties.filter((prop) =>
+            connectedPropertyIds.includes(prop.id)
+          );
+          return {
+            ...layer,
+            id: layerId,
+            properties: layerProperties,
+            elementId: element.id, // Add this to keep track of which element this layer belongs to
+          };
+        });
+
+        console.log(
+          `Layers with connected properties for element ${element.id}:`,
+          layersWithProperties
+        );
+
+        allLayersWithProperties =
+          allLayersWithProperties.concat(layersWithProperties);
+        allProperties = allProperties.concat(elementState.properties);
+        allPropertySets = allPropertySets.concat(
+          elementState.propertySets || []
+        );
+      }
+
+      // Export all data in a single IFC file
       const exportedIFC = await exportIFC(
         exportWorker,
-        selectedElement,
-        appState.layers,
-        appState.properties,
-        appState.propertySets
+        ifcElements[0], // Use the first element for the arrayBuffer
+        allLayersWithProperties,
+        allProperties,
+        allPropertySets
       );
 
       if (!(exportedIFC instanceof ArrayBuffer)) {
@@ -751,14 +908,24 @@ const App = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      alert("IFC file has been exported successfully.");
     } catch (error) {
       console.error("Error exporting IFC:", error);
       alert(`Error exporting IFC: ${error.message}`);
     }
   };
 
+  // Move this state declaration to the top of the component
+  const [showStartingScreen, setShowStartingScreen] = useState(true);
+
+  const closeStartingScreen = () => {
+    setShowStartingScreen(false);
+  };
+
   return (
     <div style={{ height: "100vh", width: "100%" }}>
+      {showStartingScreen && <StartingScreen onClose={closeStartingScreen} />}
       <ReactFlow
         nodes={nodes}
         edges={[...appState.edges, ...tempEdges]}

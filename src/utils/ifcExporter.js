@@ -1,7 +1,7 @@
 export async function exportIFC(
   worker,
-  selectedElement,
-  layers,
+  element,
+  layersWithProperties,
   properties,
   propertySets
 ) {
@@ -15,13 +15,11 @@ export async function exportIFC(
     };
 
     let arrayBuffer;
-    if (selectedElement.arrayBuffer instanceof ArrayBuffer) {
-      // Create a copy of the ArrayBuffer
-      arrayBuffer = selectedElement.arrayBuffer.slice(0);
-    } else if (typeof selectedElement.arrayBuffer === "string") {
-      // Convert base64 string to ArrayBuffer
+    if (element.arrayBuffer instanceof ArrayBuffer) {
+      arrayBuffer = element.arrayBuffer.slice(0);
+    } else if (typeof element.arrayBuffer === "string") {
       const binaryString = atob(
-        selectedElement.arrayBuffer.replace(/[^A-Za-z0-9+/=]/g, "")
+        element.arrayBuffer.replace(/[^A-Za-z0-9+/=]/g, "")
       );
       arrayBuffer = new ArrayBuffer(binaryString.length);
       const uint8Array = new Uint8Array(arrayBuffer);
@@ -33,12 +31,22 @@ export async function exportIFC(
       return;
     }
 
+    console.log(
+      "Layers with properties before sending to worker:",
+      layersWithProperties
+    );
+
+    // Ensure all data is properly stringified
+    const stringifiedLayers = JSON.stringify(layersWithProperties);
+    const stringifiedProperties = JSON.stringify(properties);
+    const stringifiedPropertySets = JSON.stringify(propertySets);
+
     worker.postMessage(
       {
         arrayBuffer: arrayBuffer,
-        layers: JSON.stringify(layers),
-        properties: JSON.stringify(properties),
-        propertySets: JSON.stringify(propertySets),
+        layers: stringifiedLayers,
+        properties: stringifiedProperties,
+        propertySets: stringifiedPropertySets,
       },
       [arrayBuffer]
     );

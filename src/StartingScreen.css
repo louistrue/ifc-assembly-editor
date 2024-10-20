@@ -1,0 +1,181 @@
+.starting-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.starting-screen-content {
+  background-color: #ffffff;
+  padding: 2rem;
+  border-radius: 15px;
+  max-width: 1200px;
+  width: 95%;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  max-height: 95vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.app-logo {
+  max-width: 100px;
+}
+
+.app-description {
+  color: #34495e;
+  margin-bottom: 1.5rem;
+  font-size: 1.2rem;
+  line-height: 1.6;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.key-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.key-point {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  transition: transform 0.3s ease;
+}
+
+.key-point:hover {
+  transform: translateY(-5px);
+}
+
+.key-point h2 {
+  color: #3498db;
+  margin-bottom: 0.5rem;
+  font-size: 1.3rem;
+}
+
+.key-point p {
+  color: #34495e;
+  font-size: 1rem;
+}
+
+.beta-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.limitations-note {
+  background-color: #e2e3e5;
+  color: #383d41;
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+}
+
+.open-source-note {
+  font-style: italic;
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+}
+
+.start-button {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.start-button:hover {
+  background-color: #27ae60;
+  transform: translateY(-2px);
+}
+
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.links a {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.links a:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+@media (max-width: 992px) {
+  .starting-screen-content {
+    padding: 1.5rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header h1 {
+    margin-bottom: 1rem;
+    font-size: 2rem;
+  }
+
+  .app-logo {
+    max-width: 80px;
+    margin-bottom: 1rem;
+  }
+
+  .key-points {
+    grid-template-columns: 1fr;
+  }
+
+  .app-description,
+  .key-point p,
+  .limitations-note,
+  .open-source-note {
+    font-size: 0.9rem;
+  }
+
+  .start-button {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+}
