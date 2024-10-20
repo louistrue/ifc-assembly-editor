@@ -13,10 +13,6 @@ You can access the live application here: [IFC Layer Editor](https://ifc-assembl
 3. **Connect Properties**: Link properties to layers using an intuitive visual interface.
 4. **Export**: Generate a new IFC file with your modifications.
 
-## Getting Started
-
-Try the Preview App: [IFC Layer Editor](https://ifc-assembly-editor.vercel.app/)
-
 ### Prerequisites
 
 - Node.js (version 12 or higher)
