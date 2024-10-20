@@ -2,6 +2,10 @@
 
 An open-source tool for editing and enhancing IFC (Industry Foundation Classes) files. Easily modify layer properties and export updated IFC models.
 
+## Demo
+
+https://github.com/louistrue/ifc-assembly-editor/assets/YOUR_ASSET_ID/layer%20editor%2001.mp4
+
 ## Live Application
 
 You can access the live application here: [IFC Layer Editor](https://ifc-assembly-editor.vercel.app/)
