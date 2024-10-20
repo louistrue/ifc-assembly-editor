@@ -4,7 +4,7 @@ An open-source tool for editing and enhancing IFC (Industry Foundation Classes) 
 
 ## Demo
 
-![IFC Layer Editor Demo](https://github.com/user-attachments/assets/62306759-d884-4347-8a8d-894b721688af)
+https://github.com/louistrue/ifc-assembly-editor/assets/62306759/d884-4347-8a8d-894b721688af
 
 ## Live Application
 
