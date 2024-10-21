@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Panel } from "reactflow";
 import { FaUpload, FaSpinner, FaThumbtack } from "react-icons/fa";
+import { processIFCFile } from "../utils/ifcUtils";
 
 const UploadPanel = ({
   isFixed,

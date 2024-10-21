@@ -41,12 +41,12 @@ import {
   processIFCFile,
   getMaterialColor,
   base64ToArrayBuffer,
+  exportIFC,
 } from "./utils/ifcUtils";
 import UploadPanel from "./components/UploadPanel";
 import PropertyPanel from "./components/PropertyPanel";
 import PropertySetPanel from "./components/PropertySetPanel";
 import ExportButton from "./components/ExportButton";
-import { exportIFC } from "./utils/ifcExporter";
 import "./StartingScreen.css";
 
 const nodeTypes = {

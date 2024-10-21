@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef } from "react";
 import { Panel } from "reactflow";
 import { FaList, FaThumbtack } from "react-icons/fa";
+import { getMaterialColor } from "../utils/ifcUtils";
 
 const PropertyPanel = forwardRef(
   (
