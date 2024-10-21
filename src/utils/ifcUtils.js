@@ -1,9 +1,7 @@
-// Create a Web Worker for Pyodide
 const pyodideWorker = new Worker(
-  new URL("../pyodideWorker.js", import.meta.url)
+  new URL("../workers/pyodideWorker.js", import.meta.url)
 );
 
-// Function to load IFC file
 export async function loadIFC(arrayBuffer) {
   return new Promise((resolve, reject) => {
     pyodideWorker.onmessage = (event) => {
@@ -18,7 +16,6 @@ export async function loadIFC(arrayBuffer) {
   });
 }
 
-// Function to handle file upload
 export async function processIFCFile(file) {
   console.log("File upload started:", file);
   try {
@@ -27,7 +24,6 @@ export async function processIFCFile(file) {
     const ifcData = await loadIFC(arrayBuffer);
     console.log("IFC data loaded:", ifcData);
 
-    // Filter elements with multiple layers
     const elementsWithMultiLayers = ifcData.filter(
       (element) => element.layers && element.layers.length > 1
     );
@@ -40,7 +36,6 @@ export async function processIFCFile(file) {
   }
 }
 
-// Function to get material color
 export function getMaterialColor(material) {
   switch (material) {
     case "Concrete":
@@ -60,11 +55,10 @@ export function getMaterialColor(material) {
     case "Brick":
       return "#d2691e";
     default:
-      return "#ffffff"; // Default color for unknown materials
+      return "#ffffff";
   }
 }
 
-// Add this function to your ifcUtils.js file
 export function base64ToArrayBuffer(base64) {
   const binaryString = window.atob(base64);
   const len = binaryString.length;
@@ -73,4 +67,58 @@ export function base64ToArrayBuffer(base64) {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes.buffer;
+}
+
+export async function exportIFC(
+  worker,
+  element,
+  layersWithProperties,
+  properties,
+  propertySets
+) {
+  return new Promise((resolve, reject) => {
+    worker.onmessage = (event) => {
+      if (event.data.error) {
+        reject(new Error(event.data.error));
+      } else {
+        resolve(event.data.result);
+      }
+    };
+
+    let arrayBuffer;
+    if (element.arrayBuffer instanceof ArrayBuffer) {
+      arrayBuffer = element.arrayBuffer.slice(0);
+    } else if (typeof element.arrayBuffer === "string") {
+      const binaryString = atob(
+        element.arrayBuffer.replace(/[^A-Za-z0-9+/=]/g, "")
+      );
+      arrayBuffer = new ArrayBuffer(binaryString.length);
+      const uint8Array = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < binaryString.length; i++) {
+        uint8Array[i] = binaryString.charCodeAt(i);
+      }
+    } else {
+      reject(new Error("Invalid arrayBuffer format"));
+      return;
+    }
+
+    console.log(
+      "Layers with properties before sending to worker:",
+      layersWithProperties
+    );
+
+    const stringifiedLayers = JSON.stringify(layersWithProperties);
+    const stringifiedProperties = JSON.stringify(properties);
+    const stringifiedPropertySets = JSON.stringify(propertySets);
+
+    worker.postMessage(
+      {
+        arrayBuffer: arrayBuffer,
+        layers: stringifiedLayers,
+        properties: stringifiedProperties,
+        propertySets: stringifiedPropertySets,
+      },
+      [arrayBuffer]
+    );
+  });
 }

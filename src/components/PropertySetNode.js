@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Handle, Position } from "reactflow";
+import { getMaterialColor } from "../utils/ifcUtils";
 
 const PropertySetNode = ({ data }) => {
   const [isEditing, setIsEditing] = useState(false);
